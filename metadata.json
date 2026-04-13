@@ -1,0 +1,6 @@
+{
+  "name": "MedWork Manager",
+  "description": "Gestionale per la medicina del lavoro con integrazione Google Sheets per la gestione di aziende, dipendenti e appuntamenti.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
