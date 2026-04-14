@@ -19,7 +19,8 @@ import {
   X,
   Settings,
   Trash2,
-  Pencil
+  Pencil,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
@@ -188,6 +189,7 @@ const Dashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'aziende' | 'calendario'>('aziende');
   const [allSlots, setAllSlots] = useState<any[]>([]);
+  const [dipendentiCache, setDipendentiCache] = useState<Record<string, Dipendente[]>>({});
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isSlotDetailOpen, setIsSlotDetailOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -241,13 +243,21 @@ const Dashboard = () => {
       console.warn('fetchDipendentiAzienda called without aziendaId');
       return;
     }
-    console.log('Fetching dipendenti for aziendaId:', aziendaId);
+
+    // Check cache first
+    if (dipendentiCache[aziendaId]) {
+      setDipendentiAzienda(dipendentiCache[aziendaId]);
+      return;
+    }
+
     setIsDipendentiLoading(true);
     try {
       const data = await fetchGAS({ action: 'getDipendenti', aziendaId });
-      console.log('Dipendenti data received:', data);
       if (Array.isArray(data)) {
-        setDipendentiAzienda(data.map(normalizeDipendente));
+        const normalized = data.map(normalizeDipendente);
+        setDipendentiAzienda(normalized);
+        // Save to cache
+        setDipendentiCache(prev => ({ ...prev, [aziendaId]: normalized }));
       } else {
         setDipendentiAzienda([]);
       }
@@ -477,12 +487,33 @@ const Dashboard = () => {
               fetchDipendentiAzienda(slot.aziendaId);
               setIsSlotDetailOpen(true);
             }}
-            eventContent={(eventInfo) => (
-              <div className="p-1 overflow-hidden">
-                <div className="font-bold text-[10px] truncate">{eventInfo.event.title}</div>
-                <div className="text-[9px] opacity-80">{eventInfo.timeText}</div>
-              </div>
-            )}
+            eventContent={(eventInfo) => {
+              const slot = eventInfo.event.extendedProps as Slot;
+              const isOccupied = slot.stato === 'Occupato';
+              
+              let employeeName = '';
+              if (isOccupied && slot.dipendenteEmail) {
+                for (const azId in dipendentiCache) {
+                  const emp = dipendentiCache[azId].find(d => d.email === slot.dipendenteEmail);
+                  if (emp) {
+                    employeeName = emp.nome;
+                    break;
+                  }
+                }
+                if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
+              }
+
+              return (
+                <div className="p-1 overflow-hidden">
+                  <div className="font-bold text-[10px] truncate">
+                    {isOccupied ? employeeName : eventInfo.event.title}
+                  </div>
+                  <div className="text-[9px] opacity-80 truncate">
+                    {slot.aziendaId} • {eventInfo.timeText}
+                  </div>
+                </div>
+              );
+            }}
           />
         </div>
       )}
@@ -513,15 +544,45 @@ const Dashboard = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-blue-600" />
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-3 h-3 rounded-full",
+                        selectedSlot.stato === 'Occupato' ? "bg-red-500" : "bg-green-500"
+                      )} />
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Stato Attuale</p>
+                        <p className="font-bold text-gray-900">{selectedSlot.stato}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Azienda</p>
-                      <p className="text-lg font-bold text-gray-900">{selectedSlot.aziendaNome}</p>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Azienda</p>
+                      <p className="font-bold text-gray-900">{selectedSlot.aziendaNome}</p>
                     </div>
                   </div>
+
+                  {selectedSlot.stato === 'Occupato' && selectedSlot.dipendenteEmail && (
+                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                      <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Dettagli Lavoratore</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-blue-900">
+                            {(() => {
+                              for (const azId in dipendentiCache) {
+                                const emp = dipendentiCache[azId].find(d => d.email === selectedSlot.dipendenteEmail);
+                                if (emp) return emp.nome;
+                              }
+                              return selectedSlot.dipendenteEmail.split('@')[0];
+                            })()}
+                          </p>
+                          <p className="text-xs text-blue-600 font-medium">{selectedSlot.dipendenteEmail}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-gray-50 rounded-2xl">
