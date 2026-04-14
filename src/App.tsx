@@ -92,7 +92,7 @@ const normalizeSlot = (s: any): Slot => {
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
     stato: stato,
     dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim(),
-    dipendenteNome: String(getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
+    dipendenteNome: String(getVal(s, 'Nome') || getVal(s, 'nome') || getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
   };
 };
 
