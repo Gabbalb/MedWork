@@ -22,7 +22,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, addMinutes, parse, isBefore, isAfter } from 'date-fns';
+import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import FullCalendar from '@fullcalendar/react';
@@ -294,6 +294,12 @@ const Dashboard = () => {
             events={allSlots.map(slot => {
               const azienda = aziende.find(a => a.id === slot.aziendaId);
               const dateObj = new Date(slot.data);
+              
+              if (!isValid(dateObj)) {
+                console.warn('Invalid date found in slot:', slot);
+                return null;
+              }
+
               const dateISO = format(dateObj, 'yyyy-MM-dd');
               return {
                 id: `${slot.aziendaId}-${slot.data}-${slot.inizio}`,
@@ -304,7 +310,7 @@ const Dashboard = () => {
                 borderColor: 'transparent',
                 extendedProps: { ...slot, aziendaNome: azienda ? azienda.nome : 'N/A' }
               };
-            })}
+            }).filter(Boolean)}
             eventClick={(info) => {
               setSelectedSlot(info.event.extendedProps);
               setIsSlotDetailOpen(true);
@@ -358,7 +364,12 @@ const Dashboard = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-gray-50 rounded-2xl">
                       <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Data</p>
-                      <p className="font-bold text-gray-900">{format(new Date(selectedSlot.data), 'dd/MM/yyyy')}</p>
+                      <p className="font-bold text-gray-900">
+                        {(() => {
+                          const d = new Date(selectedSlot.data);
+                          return isValid(d) ? format(d, 'dd/MM/yyyy') : 'Data non valida';
+                        })()}
+                      </p>
                     </div>
                     <div className="p-4 bg-gray-50 rounded-2xl">
                       <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Stato</p>
@@ -795,13 +806,18 @@ const CompanyDetail = () => {
     // Group slots by date
     const firstSlot = sortedSlots[0];
     const firstDateObj = new Date(firstSlot.data);
+    
+    if (!isValid(firstDateObj)) return null;
+
     const firstDateISO = format(firstDateObj, 'yyyy-MM-dd');
     
     const sameDateSlots = sortedSlots.filter(s => {
       const sDateObj = new Date(s.data);
-      return format(sDateObj, 'yyyy-MM-dd') === firstDateISO;
+      return isValid(sDateObj) && format(sDateObj, 'yyyy-MM-dd') === firstDateISO;
     });
     
+    if (sameDateSlots.length === 0) return null;
+
     const startTime = sameDateSlots[0].inizio;
     const endTime = sameDateSlots[sameDateSlots.length - 1].fine;
     const duration = sameDateSlots[0].durata;
