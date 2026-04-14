@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* FullCalendar Custom Styles */
+.fc {
+  --fc-border-color: #f3f4f6;
+  --fc-today-bg-color: #eff6ff;
+  --fc-event-resizer-thickness: 8px;
+  font-family: inherit;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.fc .fc-button-primary {
+  background-color: #fff;
+  border-color: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+  text-transform: capitalize;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 12px 4px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.fc-timegrid-slot {
+  height: 3rem !important;
+}
+
+.fc-event {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px;
+  transition: transform 0.1s;
+}
+
+.fc-event:hover {
+  transform: scale(1.02);
+  z-index: 10;
+}

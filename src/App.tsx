@@ -25,6 +25,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import itLocale from '@fullcalendar/core/locales/it';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -109,6 +114,10 @@ const Dashboard = () => {
   const [aziende, setAziende] = useState<Azienda[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'aziende' | 'calendario'>('aziende');
+  const [allSlots, setAllSlots] = useState<any[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [isSlotDetailOpen, setIsSlotDetailOpen] = useState(false);
   const [newCompany, setNewCompany] = useState({
     nome: '',
     logo: '',
@@ -135,8 +144,20 @@ const Dashboard = () => {
       });
   };
 
+  const fetchAllSlots = async () => {
+    try {
+      const data = await fetchGAS({ action: 'getAllSlots' });
+      if (Array.isArray(data)) {
+        setAllSlots(data);
+      }
+    } catch (err) {
+      console.error('Error fetching all slots:', err);
+    }
+  };
+
   useEffect(() => {
     fetchAziende();
+    fetchAllSlots();
   }, []);
 
   const handleAddCompany = async (e: React.FormEvent) => {
@@ -193,45 +214,182 @@ const Dashboard = () => {
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Aziendale</h1>
-          <p className="text-gray-500 mt-2">Seleziona un'azienda per gestire dipendenti e disponibilità.</p>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard MedWork</h1>
+          <p className="text-gray-500 mt-2">Gestione dipendenti e disponibilità visite mediche.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center gap-2 w-fit"
-        >
-          <Plus className="w-5 h-5" />
-          Nuova Azienda
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-1 rounded-xl border border-gray-200 flex shadow-sm">
+            <button 
+              onClick={() => setActiveTab('aziende')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                activeTab === 'aziende' ? "bg-blue-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
+              )}
+            >
+              Aziende
+            </button>
+            <button 
+              onClick={() => setActiveTab('calendario')}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                activeTab === 'calendario' ? "bg-blue-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
+              )}
+            >
+              Calendario
+            </button>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center gap-2 w-fit"
+          >
+            <Plus className="w-5 h-5" />
+            Nuova Azienda
+          </button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {aziende.map((azienda) => (
-          <motion.div
-            key={azienda.id}
-            whileHover={{ y: -4 }}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group"
-          >
-            <Link to={`/azienda/${azienda.id}`} className="block p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-16 h-16 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">
-                  {azienda.logo ? (
-                    <img src={azienda.logo} alt={azienda.nome} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
-                  ) : (
-                    <Building2 className="w-8 h-8 text-gray-400" />
-                  )}
+      {activeTab === 'aziende' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {aziende.map((azienda) => (
+            <motion.div
+              key={azienda.id}
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group"
+            >
+              <Link to={`/azienda/${azienda.id}`} className="block p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-16 h-16 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden">
+                    {azienda.logo ? (
+                      <img src={azienda.logo} alt={azienda.nome} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                    ) : (
+                      <Building2 className="w-8 h-8 text-gray-400" />
+                    )}
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transition-colors" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transition-colors" />
+                <h3 className="text-xl font-bold text-gray-900 mb-1">{azienda.nome}</h3>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>{azienda.indirizzo || 'Indirizzo non specificato'}</span>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            }}
+            locale={itLocale}
+            slotMinTime="07:00:00"
+            slotMaxTime="20:00:00"
+            allDaySlot={false}
+            height="auto"
+            events={allSlots.map(slot => {
+              const azienda = aziende.find(a => a.id === slot.aziendaId);
+              const dateObj = new Date(slot.data);
+              const dateISO = format(dateObj, 'yyyy-MM-dd');
+              return {
+                id: `${slot.aziendaId}-${slot.data}-${slot.inizio}`,
+                title: azienda ? azienda.nome : 'Slot',
+                start: `${dateISO}T${slot.inizio}`,
+                end: `${dateISO}T${slot.fine}`,
+                backgroundColor: slot.stato === 'Occupato' ? '#ef4444' : '#3b82f6',
+                borderColor: 'transparent',
+                extendedProps: { ...slot, aziendaNome: azienda ? azienda.nome : 'N/A' }
+              };
+            })}
+            eventClick={(info) => {
+              setSelectedSlot(info.event.extendedProps);
+              setIsSlotDetailOpen(true);
+            }}
+            eventContent={(eventInfo) => (
+              <div className="p-1 overflow-hidden">
+                <div className="font-bold text-[10px] truncate">{eventInfo.event.title}</div>
+                <div className="text-[9px] opacity-80">{eventInfo.timeText}</div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">{azienda.nome}</h3>
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <LayoutDashboard className="w-4 h-4" />
-                <span>{azienda.indirizzo || 'Indirizzo non specificato'}</span>
+            )}
+          />
+        </div>
+      )}
+
+      {/* Modal Dettaglio Slot */}
+      <AnimatePresence>
+        {isSlotDetailOpen && selectedSlot && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSlotDetailOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Dettaglio Slot</h2>
+                  <button onClick={() => setIsSlotDetailOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <X className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Azienda</p>
+                      <p className="text-lg font-bold text-gray-900">{selectedSlot.aziendaNome}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-2xl">
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Data</p>
+                      <p className="font-bold text-gray-900">{format(new Date(selectedSlot.data), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-2xl">
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Stato</p>
+                      <p className={cn(
+                        "font-bold",
+                        selectedSlot.stato === 'Occupato' ? "text-red-600" : "text-green-600"
+                      )}>{selectedSlot.stato}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-2xl">
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Orario</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <p className="font-bold text-gray-900">{selectedSlot.inizio} - {selectedSlot.fine}</p>
+                      <span className="text-xs text-gray-400 font-medium">({selectedSlot.durata} min)</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setIsSlotDetailOpen(false)}
+                    className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all mt-4"
+                  >
+                    Chiudi
+                  </button>
+                </div>
               </div>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal Nuova Azienda */}
       <AnimatePresence>
