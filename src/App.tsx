@@ -124,17 +124,26 @@ const fetchGAS = async (params: any, body?: any) => {
     const url = new URL(GAS_URL);
     Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
     
-    const options: any = {
+    const options: RequestInit = {
       method: body ? 'POST' : 'GET',
       mode: 'cors',
+      redirect: 'follow',
     };
     
     if (body) {
+      // We use text/plain to avoid CORS preflight (OPTIONS request)
+      // which Google Apps Script does not support.
       options.body = JSON.stringify(body);
+      options.headers = {
+        'Content-Type': 'text/plain;charset=utf-8'
+      };
     }
     
     const res = await fetch(url.toString(), options);
-    return res.json();
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return await res.json();
   } catch (err) {
     console.error('Error in fetchGAS:', err);
     throw err;
