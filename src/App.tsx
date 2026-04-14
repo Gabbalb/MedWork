@@ -74,12 +74,14 @@ const normalizeSlot = (s: any): Slot => {
   };
   
   let rawData = String(getVal(s, 'Data') || getVal(s, 'data') || '');
-  // Se la data contiene 'T', è un formato ISO. Estraiamo solo la parte YYYY-MM-DD.
-  // Se però è stata spostata dal fuso orario (es. 22:00 del giorno prima), 
-  // dobbiamo stare attenti. Ma la soluzione migliore è che GAS invii già YYYY-MM-DD.
   if (rawData.includes('T')) {
     rawData = rawData.split('T')[0];
   }
+
+  // Normalizziamo lo stato per evitare problemi di maiuscole/minuscole o spazi
+  const rawStato = String(getVal(s, 'Stato') || getVal(s, 'stato') || '').trim();
+  const stato = rawStato.toLowerCase() === 'occupato' ? 'Occupato' : 
+                rawStato.toLowerCase() === 'libero' ? 'Libero' : rawStato;
 
   return {
     aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || ''),
@@ -87,8 +89,8 @@ const normalizeSlot = (s: any): Slot => {
     inizio: String(getVal(s, 'Inizio') || getVal(s, 'inizio') || ''),
     fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
-    stato: String(getVal(s, 'Stato') || getVal(s, 'stato') || ''),
-    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || '')
+    stato: stato,
+    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim()
   };
 };
 
@@ -118,8 +120,8 @@ const normalizeDipendente = (d: any): Dipendente => {
   return {
     id: String(getVal(d, 'ID') || getVal(d, 'id') || ''),
     aziendaId: String(d.aziendaId || ''),
-    nome: String(getVal(d, 'Nome') || getVal(d, 'nome') || ''),
-    email: String(getVal(d, 'Mail') || getVal(d, 'mail') || getVal(d, 'Email') || getVal(d, 'email') || ''),
+    nome: String(getVal(d, 'Nome') || getVal(d, 'nome') || '').trim(),
+    email: String(getVal(d, 'Mail') || getVal(d, 'mail') || getVal(d, 'Email') || getVal(d, 'email') || '').toLowerCase().trim(),
     sesso: String(getVal(d, 'Sesso') || getVal(d, 'sesso') || '')
   };
 };
@@ -210,12 +212,7 @@ const Dashboard = () => {
     fetchGAS({ action: 'getAziende' })
       .then(data => {
         if (Array.isArray(data)) {
-          const normalizedAziende = data.map(normalizeAzienda);
-          setAziende(normalizedAziende);
-          // Pre-fetch dipendenti for all aziende to populate cache
-          normalizedAziende.forEach(az => {
-            if (az.id) fetchDipendentiAzienda(az.id);
-          });
+          setAziende(data.map(normalizeAzienda));
         } else {
           console.error('API returned non-array data:', data);
           setAziende([]);
@@ -243,6 +240,16 @@ const Dashboard = () => {
     fetchAziende();
     fetchAllSlots();
   }, []);
+
+  useEffect(() => {
+    if (aziende.length > 0) {
+      aziende.forEach(az => {
+        if (az.id && !dipendentiCache[az.id]) {
+          fetchDipendentiAzienda(az.id);
+        }
+      });
+    }
+  }, [aziende]);
 
   const fetchDipendentiAzienda = async (aziendaId: string) => {
     if (!aziendaId) {
@@ -495,17 +502,21 @@ const Dashboard = () => {
             }}
             eventContent={(eventInfo) => {
               const slot = eventInfo.event.extendedProps as Slot;
-              const isOccupied = slot.stato === 'Occupato';
+              const isOccupied = slot.stato?.toLowerCase() === 'occupato';
               
               let employeeName = '';
               if (isOccupied) {
                 if (slot.dipendenteEmail) {
+                  const searchEmail = slot.dipendenteEmail.toLowerCase().trim();
                   // Cerca nella cache
                   for (const azId in dipendentiCache) {
-                    const emp = dipendentiCache[azId].find(d => d.email === slot.dipendenteEmail);
-                    if (emp) {
-                      employeeName = emp.nome;
-                      break;
+                    const list = dipendentiCache[azId];
+                    if (Array.isArray(list)) {
+                      const emp = list.find(d => d.email.toLowerCase().trim() === searchEmail);
+                      if (emp) {
+                        employeeName = emp.nome;
+                        break;
+                      }
                     }
                   }
                   // Fallback all'email se il nome non è in cache
@@ -519,10 +530,10 @@ const Dashboard = () => {
               return (
                 <div className="p-1 overflow-hidden flex flex-col h-full">
                   <div className="font-bold text-[10px] truncate leading-tight">
-                    {isOccupied ? employeeName : eventInfo.event.title}
+                    {isOccupied ? (employeeName || 'Occupato') : 'Libero'}
                   </div>
                   <div className="text-[9px] opacity-80 truncate leading-tight mt-0.5">
-                    {slot.aziendaId} • {eventInfo.timeText}
+                    {(slot as any).aziendaNome || slot.aziendaId} • {eventInfo.timeText}
                   </div>
                 </div>
               );
@@ -584,8 +595,11 @@ const Dashboard = () => {
                         <div>
                           <p className="font-bold text-blue-900">
                             {(() => {
+                              const searchEmail = selectedSlot.dipendenteEmail.toLowerCase().trim();
                               for (const azId in dipendentiCache) {
-                                const emp = dipendentiCache[azId].find(d => d.email === selectedSlot.dipendenteEmail);
+                                const emp = dipendentiCache[azId].find(d => 
+                                  d.email.toLowerCase().trim() === searchEmail
+                                );
                                 if (emp) return emp.nome;
                               }
                               return selectedSlot.dipendenteEmail.split('@')[0];
