@@ -82,13 +82,16 @@ const normalizeAzienda = (a: any): Azienda => ({
   prossimaConvocazione: a.prossimaConvocazione || a['ProssimaConvocazione'] || ''
 });
 
-const normalizeDipendente = (d: any): Dipendente => ({
-  id: d.id || d['Id'] || '',
-  aziendaId: d.aziendaId || d['Id-Azienda'] || '',
-  nome: d.nome || d['Nome'] || '',
-  email: d.email || d['Email'] || '',
-  sesso: d.sesso || d['Sesso'] || ''
-});
+const normalizeDipendente = (d: any): Dipendente => {
+  if (!d) return { id: '', aziendaId: '', nome: '', email: '', sesso: '' };
+  return {
+    id: d.id || d['Id'] || d['ID'] || '',
+    aziendaId: d.aziendaId || d['Id-Azienda'] || d['id-azienda'] || d['aziendaid'] || '',
+    nome: d.nome || d['Nome'] || d['nome'] || '',
+    email: d.email || d['Email'] || d['email'] || '',
+    sesso: d.sesso || d['Sesso'] || d['sesso'] || ''
+  };
+};
 
 // Components
 const Navbar = () => (
@@ -148,6 +151,7 @@ const Dashboard = () => {
   const [isSlotDetailOpen, setIsSlotDetailOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [dipendentiAzienda, setDipendentiAzienda] = useState<Dipendente[]>([]);
+  const [isDipendentiLoading, setIsDipendentiLoading] = useState(false);
   const [isSlotActionLoading, setIsSlotActionLoading] = useState(false);
   const [newCompany, setNewCompany] = useState({
     nome: '',
@@ -192,13 +196,25 @@ const Dashboard = () => {
   }, []);
 
   const fetchDipendentiAzienda = async (aziendaId: string) => {
+    if (!aziendaId) {
+      console.warn('fetchDipendentiAzienda called without aziendaId');
+      return;
+    }
+    console.log('Fetching dipendenti for aziendaId:', aziendaId);
+    setIsDipendentiLoading(true);
     try {
       const data = await fetchGAS({ action: 'getDipendenti', aziendaId });
+      console.log('Dipendenti data received:', data);
       if (Array.isArray(data)) {
         setDipendentiAzienda(data.map(normalizeDipendente));
+      } else {
+        setDipendentiAzienda([]);
       }
     } catch (err) {
       console.error('Error fetching dipendenti for azienda:', err);
+      setDipendentiAzienda([]);
+    } finally {
+      setIsDipendentiLoading(false);
     }
   };
 
@@ -486,12 +502,22 @@ const Dashboard = () => {
                         <select 
                           value={selectedEmployeeId}
                           onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                          disabled={isDipendentiLoading}
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400"
                         >
-                          <option value="">Seleziona dipendente...</option>
-                          {dipendentiAzienda.map(d => (
-                            <option key={d.id} value={d.id}>{d.nome}</option>
-                          ))}
+                          {isDipendentiLoading ? (
+                            <option>Caricamento dipendenti...</option>
+                          ) : (
+                            <>
+                              <option value="">Seleziona dipendente...</option>
+                              {dipendentiAzienda.map(d => (
+                                <option key={d.id} value={d.id}>{d.nome}</option>
+                              ))}
+                              {dipendentiAzienda.length === 0 && (
+                                <option disabled>Nessun dipendente trovato</option>
+                              )}
+                            </>
+                          )}
                         </select>
                       </div>
                       
