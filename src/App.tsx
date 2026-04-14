@@ -506,23 +506,24 @@ const CompanyDetail = () => {
     }
   };
 
-  const handleCancelConvocation = async () => {
-    if (!window.confirm('Annullare la prossima convocazione?')) return;
-    setSettingsSaving(true);
+  const handleDeleteConvocation = async (targetDate: string) => {
+    if (!window.confirm('Sei sicuro di voler eliminare questa convocazione? Tutti gli slot di questo giorno verranno rimossi.')) return;
+    setSaving(true);
     try {
-      const data = await fetchGAS({ action: 'updateAzienda' }, {
-        action: 'updateAzienda',
-        id,
-        ...editCompany,
-        prossimaConvocazione: ''
+      const data = await fetchGAS({ action: 'addDisponibilita' }, {
+        action: 'addDisponibilita',
+        aziendaId: id,
+        date: targetDate,
+        slots: [] // Empty array means delete for this date
       });
       if (data.success) {
-        setAzienda({ ...azienda!, prossimaConvocazione: '' });
+        fetchSlots();
+        setIsConvocationModalOpen(false);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setSettingsSaving(false);
+      setSaving(false);
     }
   };
 
@@ -539,6 +540,11 @@ const CompanyDetail = () => {
       if (data.success) {
         setAzienda({ ...azienda!, ...editCompany });
         setIsSettingsModalOpen(false);
+        fetchGAS({ action: 'getAziende' }).then(aziende => {
+          const aziendeList = Array.isArray(aziende) ? aziende : [];
+          const found = aziendeList.find((a: Azienda) => a.id === id);
+          if (found) setAzienda(found);
+        });
       } else {
         setSettingsError(data.error || 'Errore durante l\'aggiornamento');
       }
@@ -599,6 +605,7 @@ const CompanyDetail = () => {
       const data = await fetchGAS({ action: 'addDisponibilita' }, {
         action: 'addDisponibilita',
         aziendaId: azienda.id,
+        date: date, // Explicit date for overwrite
         slots
       });
       if (data.success) {
@@ -670,9 +677,12 @@ const CompanyDetail = () => {
                 <div className="flex gap-2 border-l border-amber-200 pl-3">
                   <button 
                     onClick={() => {
-                      // Scroll to slot generator
-                      const el = document.getElementById('slot-generator');
-                      el?.scrollIntoView({ behavior: 'smooth' });
+                      // Set generator state to current convocation values
+                      const [d, m, y] = nextConvocation.date.split('/');
+                      setDate(`${y}-${m}-${d}`);
+                      setStartTime(nextConvocation.start);
+                      setEndTime(nextConvocation.end);
+                      setIsConvocationModalOpen(true);
                     }}
                     className="text-amber-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider"
                   >
@@ -1134,6 +1144,98 @@ const CompanyDetail = () => {
           </div>
         )}
       </AnimatePresence>
+      {/* Edit Convocation Modal */}
+      <AnimatePresence>
+        {isConvocationModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Gestisci Convocazione</h2>
+                  <button onClick={() => setIsConvocationModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <X className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Data</label>
+                      <input 
+                        type="date" 
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Durata Visita (min)</label>
+                      <input 
+                        type="number" 
+                        value={duration}
+                        onChange={e => setDuration(parseInt(e.target.value))}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Ora Inizio</label>
+                      <input 
+                        type="time" 
+                        value={startTime}
+                        onChange={e => setStartTime(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Ora Fine</label>
+                      <input 
+                        type="time" 
+                        value={endTime}
+                        onChange={e => setEndTime(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex flex-col gap-3">
+                    <button 
+                      onClick={async () => {
+                        await handleGenerateSlots();
+                        setIsConvocationModalOpen(false);
+                      }}
+                      disabled={saving}
+                      className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                    >
+                      {saving ? 'Aggiornamento...' : 'Salva Modifiche'}
+                    </button>
+                    
+                    <button 
+                      onClick={async () => {
+                        await handleDeleteConvocation(date);
+                        setIsConvocationModalOpen(false);
+                      }}
+                      disabled={saving}
+                      className="w-full py-3 rounded-xl font-bold text-red-600 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      Elimina Convocazione
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {isSettingsModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
