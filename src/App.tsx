@@ -18,7 +18,8 @@ import {
   AlertCircle,
   X,
   Settings,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter } from 'date-fns';
@@ -37,6 +38,15 @@ interface Azienda {
   logo: string;
   indirizzo: string;
   prossimaConvocazione?: string;
+}
+
+interface Slot {
+  aziendaId: string;
+  data: string;
+  inizio: string;
+  fine: string;
+  durata: string;
+  stato: string;
 }
 
 interface Dipendente {
@@ -321,6 +331,7 @@ const CompanyDetail = () => {
   const navigate = useNavigate();
   const [azienda, setAzienda] = useState<Azienda | null>(null);
   const [dipendenti, setDipendenti] = useState<Dipendente[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Modal State for New Employee
@@ -367,12 +378,21 @@ const CompanyDetail = () => {
       .catch(err => console.error(err));
   };
 
+  const fetchSlots = () => {
+    fetchGAS({ action: 'getSlots', aziendaId: id })
+      .then(data => {
+        setSlots(Array.isArray(data) ? data : []);
+      })
+      .catch(err => console.error(err));
+  };
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
       fetchGAS({ action: 'getAziende' }),
-      fetchGAS({ action: 'getDipendenti', aziendaId: id })
-    ]).then(([aziende, dipendentiData]) => {
+      fetchGAS({ action: 'getDipendenti', aziendaId: id }),
+      fetchGAS({ action: 'getSlots', aziendaId: id })
+    ]).then(([aziende, dipendentiData, slotsData]) => {
       const aziendeList = Array.isArray(aziende) ? aziende : [];
       const found = aziendeList.find((a: Azienda) => a.id === id);
       setAzienda(found || null);
@@ -385,6 +405,7 @@ const CompanyDetail = () => {
         });
       }
       setDipendenti(Array.isArray(dipendentiData) ? dipendentiData : []);
+      setSlots(Array.isArray(slotsData) ? slotsData : []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -582,6 +603,7 @@ const CompanyDetail = () => {
       });
       if (data.success) {
         setSuccess(true);
+        fetchSlots();
         setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
@@ -594,6 +616,28 @@ const CompanyDetail = () => {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   if (!GAS_URL) return <div className="text-center py-20 text-amber-600 font-medium">Configurazione mancante: VITE_GAS_URL non impostata.</div>;
   if (!azienda) return <div className="text-center py-20">Azienda non trovata.</div>;
+
+  // Calculate next convocation from slots
+  const nextConvocation = slots.length > 0 ? (() => {
+    const sortedSlots = [...slots].sort((a, b) => {
+      const dateA = new Date(`${a.data}T${a.inizio}`);
+      const dateB = new Date(`${b.data}T${b.inizio}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    // Group slots by date
+    const firstDate = sortedSlots[0].data;
+    const sameDateSlots = sortedSlots.filter(s => s.data === firstDate);
+    
+    const startTime = sameDateSlots[0].inizio;
+    const endTime = sameDateSlots[sameDateSlots.length - 1].fine;
+    
+    return {
+      date: format(new Date(firstDate), 'dd/MM/yyyy'),
+      start: startTime,
+      end: endTime
+    };
+  })() : null;
 
   return (
     <div className="space-y-8 pb-20">
@@ -617,40 +661,25 @@ const CompanyDetail = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{azienda.nome}</h1>
             <p className="text-gray-500">{azienda.indirizzo || 'Indirizzo non specificato'}</p>
-            {azienda.prossimaConvocazione && (
+            {nextConvocation && (
               <div className="mt-3 inline-flex items-center gap-3 bg-amber-50 border border-amber-100 px-4 py-2 rounded-xl">
                 <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
                   <CalendarIcon className="w-4 h-4" />
-                  <span>Prossima convocazione: <strong>{azienda.prossimaConvocazione}</strong></span>
+                  <span>Prossima convocazione il giorno <strong>{nextConvocation.date}</strong> dalle ore <strong>{nextConvocation.start}</strong> alle ore <strong>{nextConvocation.end}</strong></span>
                 </div>
                 <div className="flex gap-2 border-l border-amber-200 pl-3">
                   <button 
                     onClick={() => {
-                      const [d, t] = (azienda.prossimaConvocazione || '').split(' | ');
-                      setConvocationData({ date: d || '', timeRange: t || '' });
-                      setIsConvocationModalOpen(true);
+                      // Scroll to slot generator
+                      const el = document.getElementById('slot-generator');
+                      el?.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="text-amber-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider"
                   >
                     Modifica
                   </button>
-                  <button 
-                    onClick={handleCancelConvocation}
-                    className="text-red-600 hover:text-red-700 text-xs font-bold uppercase tracking-wider"
-                  >
-                    Annulla
-                  </button>
                 </div>
               </div>
-            )}
-            {!azienda.prossimaConvocazione && (
-              <button 
-                onClick={() => setIsConvocationModalOpen(true)}
-                className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-bold flex items-center gap-1"
-              >
-                <Plus className="w-4 h-4" />
-                Imposta prossima convocazione
-              </button>
             )}
           </div>
         </div>
@@ -671,7 +700,7 @@ const CompanyDetail = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Slot Generator Form */}
-        <div className="space-y-4">
+        <div className="space-y-4" id="slot-generator">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-blue-600" />
             Genera Slot Visite
@@ -801,17 +830,17 @@ const CompanyDetail = () => {
                             setNewEmp({ nome: d.nome, email: d.email, sesso: d.sesso });
                             setIsEditEmpModalOpen(true);
                           }}
-                          className="p-2 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
+                          className="p-2 hover:bg-green-50 text-green-600 rounded-lg transition-colors"
                           title="Modifica"
                         >
-                          <Settings className="w-4 h-4" />
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => handleDeleteDipendente(d.id)}
-                          className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                          className="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
                           title="Elimina"
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
