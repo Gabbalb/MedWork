@@ -254,7 +254,6 @@ const Dashboard = () => {
     if (!selectedSlot) return;
     setIsSlotActionLoading(true);
     
-    // Find employee email if dipendenteId is provided
     let dipendenteEmail = '';
     if (dipendenteId) {
       const emp = dipendentiAzienda.find(d => d.id === dipendenteId);
@@ -262,21 +261,27 @@ const Dashboard = () => {
     }
 
     try {
+      // Ensure date is in YYYY-MM-DD format for GAS
+      const slotDate = selectedSlot.data.includes('T') ? selectedSlot.data.split('T')[0] : selectedSlot.data;
+      
       const data = await fetchGAS({ action: 'updateSlot' }, {
         action: 'updateSlot',
         aziendaId: selectedSlot.aziendaId,
-        data: selectedSlot.data,
+        data: slotDate,
         inizio: selectedSlot.inizio,
         stato: newStatus,
-        dipendenteId: dipendenteId || '',
         dipendenteEmail: dipendenteEmail
       });
       if (data.success) {
         fetchAllSlots();
         setIsSlotDetailOpen(false);
+      } else {
+        console.error('Update slot failed:', data.error);
+        alert('Errore: ' + (data.error || 'Impossibile aggiornare lo slot'));
       }
     } catch (err) {
       console.error('Error updating slot:', err);
+      alert('Errore di connessione durante l\'aggiornamento dello slot');
     } finally {
       setIsSlotActionLoading(false);
     }
@@ -830,7 +835,9 @@ const CompanyDetail = () => {
         action: 'updateDipendente',
         aziendaId: id,
         dipendenteId: editingEmp.id,
-        ...newEmp
+        nome: newEmp.nome,
+        email: newEmp.email,
+        sesso: newEmp.sesso
       });
       if (data.success) {
         setIsEditEmpModalOpen(false);
@@ -915,13 +922,17 @@ const CompanyDetail = () => {
       const data = await fetchGAS({ action: 'updateAzienda' }, {
         action: 'updateAzienda',
         id,
-        ...editCompany
+        nome: editCompany.nome,
+        logo: editCompany.logo,
+        indirizzo: editCompany.indirizzo,
+        prossimaConvocazione: editCompany.prossimaConvocazione
       });
       if (data.success) {
         setAzienda({ ...azienda!, ...editCompany });
         setIsSettingsModalOpen(false);
+        // Refresh aziende list to update dashboard
         fetchGAS({ action: 'getAziende' }).then(aziende => {
-          const aziendeList = Array.isArray(aziende) ? aziende : [];
+          const aziendeList = Array.isArray(aziende) ? aziende.map(normalizeAzienda) : [];
           const found = aziendeList.find((a: Azienda) => a.id === id);
           if (found) setAzienda(found);
         });
