@@ -1085,79 +1085,6 @@ const CompanyDetail = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal Prossima Convocazione */}
-      <AnimatePresence>
-        {isConvocationModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsConvocationModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900">Imposta Convocazione</h2>
-                  <button 
-                    onClick={() => setIsConvocationModalOpen(false)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <X className="w-6 h-6 text-gray-400" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleUpdateConvocation} className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">Data</label>
-                    <input 
-                      required
-                      type="date"
-                      value={convocationData.date}
-                      onChange={e => setConvocationData({...convocationData, date: e.target.value})}
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">Fascia Oraria (es. 09:00 - 13:00)</label>
-                    <input 
-                      required
-                      placeholder="es. 09:00 - 13:00"
-                      value={convocationData.timeRange}
-                      onChange={e => setConvocationData({...convocationData, timeRange: e.target.value})}
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <button 
-                      type="button"
-                      onClick={() => setIsConvocationModalOpen(false)}
-                      className="flex-1 px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors"
-                    >
-                      Annulla
-                    </button>
-                    <button 
-                      type="submit"
-                      disabled={settingsSaving}
-                      className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
-                    >
-                      {settingsSaving ? 'Salvataggio...' : 'Salva'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
       {/* Edit Convocation Modal */}
       <AnimatePresence>
         {isConvocationModalOpen && (
@@ -1166,69 +1093,82 @@ const CompanyDetail = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+              className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Gestisci Convocazione</h2>
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900">Imposta Convocazione</h2>
                   <button onClick={() => setIsConvocationModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <X className="w-6 h-6 text-gray-400" />
                   </button>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Data</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 ml-1">Data</label>
+                    <div className="relative">
                       <input 
                         type="date" 
                         value={date}
                         onChange={e => setDate(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Durata Visita (min)</label>
-                      <input 
-                        type="number" 
-                        value={duration}
-                        onChange={e => setDuration(parseInt(e.target.value))}
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700 font-medium bg-gray-50/30"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Ora Inizio</label>
-                      <input 
-                        type="time" 
-                        value={startTime}
-                        onChange={e => setStartTime(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
+                      <label className="text-sm font-bold text-gray-900 ml-1">Inizio</label>
+                      <div className="relative">
+                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input 
+                          type="time" 
+                          value={startTime}
+                          onChange={e => setStartTime(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700 font-medium bg-gray-50/30"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Ora Fine</label>
-                      <input 
-                        type="time" 
-                        value={endTime}
-                        onChange={e => setEndTime(e.target.value)}
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
+                      <label className="text-sm font-bold text-gray-900 ml-1">Fine</label>
+                      <div className="relative">
+                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input 
+                          type="time" 
+                          value={endTime}
+                          onChange={e => setEndTime(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700 font-medium bg-gray-50/30"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 flex flex-col gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 ml-1">Durata Slot (minuti)</label>
+                    <select 
+                      value={duration}
+                      onChange={e => setDuration(parseInt(e.target.value))}
+                      className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700 font-medium bg-gray-50/30 appearance-none cursor-pointer"
+                    >
+                      <option value="15">15 minuti</option>
+                      <option value="20">20 minuti</option>
+                      <option value="30">30 minuti</option>
+                      <option value="45">45 minuti</option>
+                      <option value="60">60 minuti</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-6 flex flex-col gap-3">
                     <button 
                       onClick={async () => {
                         await handleGenerateSlots();
                         setIsConvocationModalOpen(false);
                       }}
                       disabled={saving}
-                      className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {saving ? 'Aggiornamento...' : 'Salva Modifiche'}
+                      <Plus className="w-5 h-5" />
+                      {saving ? 'Salvataggio...' : 'Salva Disponibilità'}
                     </button>
                     
                     <button 
@@ -1237,9 +1177,9 @@ const CompanyDetail = () => {
                         setIsConvocationModalOpen(false);
                       }}
                       disabled={saving}
-                      className="w-full py-3 rounded-xl font-bold text-red-600 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3 rounded-xl font-bold text-red-500 hover:bg-red-50 transition-all flex items-center justify-center gap-2 text-sm"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                       Elimina Convocazione
                     </button>
                   </div>
