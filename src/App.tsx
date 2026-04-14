@@ -91,8 +91,8 @@ const normalizeSlot = (s: any): Slot => {
     fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
     stato: stato,
-    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim(),
-    dipendenteNome: String(getVal(s, 'Nome') || getVal(s, 'nome') || getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
+    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'dipendenteEmail') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim(),
+    dipendenteNome: String(getVal(s, 'Nome') || getVal(s, 'nome') || getVal(s, 'dipendenteNome') || getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
   };
 };
 
@@ -479,8 +479,7 @@ const Dashboard = () => {
             slotMaxTime="20:00:00"
             allDaySlot={false}
             height="auto"
-            events={allSlots.map(s => {
-              const slot = normalizeSlot(s);
+            events={allSlots.map(slot => {
               const azienda = aziende.find(a => a.id === slot.aziendaId);
               const dateObj = new Date(slot.data);
               
