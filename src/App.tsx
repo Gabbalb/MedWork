@@ -629,20 +629,19 @@ const CompanyDetail = () => {
   // Calculate next convocation from slots
   const nextConvocation = slots.length > 0 ? (() => {
     const sortedSlots = [...slots].sort((a, b) => {
-      // Normalize date string (handle ISO strings from GAS)
-      const dateAStr = a.data.includes('T') ? a.data.split('T')[0] : a.data;
-      const dateBStr = b.data.includes('T') ? b.data.split('T')[0] : b.data;
-      const dateA = new Date(`${dateAStr}T${a.inizio}`);
-      const dateB = new Date(`${dateBStr}T${b.inizio}`);
+      const dateA = new Date(a.data.includes('T') ? a.data : `${a.data}T${a.inizio}`);
+      const dateB = new Date(b.data.includes('T') ? b.data : `${b.data}T${b.inizio}`);
       return dateA.getTime() - dateB.getTime();
     });
     
     // Group slots by date
-    const firstDateRaw = sortedSlots[0].data;
-    const firstDateStr = firstDateRaw.includes('T') ? firstDateRaw.split('T')[0] : firstDateRaw;
+    const firstSlot = sortedSlots[0];
+    const firstDateObj = new Date(firstSlot.data);
+    const firstDateISO = format(firstDateObj, 'yyyy-MM-dd');
+    
     const sameDateSlots = sortedSlots.filter(s => {
-      const sDateStr = s.data.includes('T') ? s.data.split('T')[0] : s.data;
-      return sDateStr === firstDateStr;
+      const sDateObj = new Date(s.data);
+      return format(sDateObj, 'yyyy-MM-dd') === firstDateISO;
     });
     
     const startTime = sameDateSlots[0].inizio;
@@ -650,8 +649,8 @@ const CompanyDetail = () => {
     const duration = sameDateSlots[0].durata;
     
     return {
-      date: format(parse(firstDateStr, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy'),
-      rawDate: firstDateStr,
+      date: format(firstDateObj, 'dd/MM/yyyy'),
+      rawDate: firstDateISO,
       start: startTime,
       end: endTime,
       duration: duration
