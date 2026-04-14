@@ -36,13 +36,15 @@ interface Azienda {
   nome: string;
   logo: string;
   indirizzo: string;
+  prossimaConvocazione?: string;
 }
 
 interface Dipendente {
+  id: string;
   aziendaId: string;
   nome: string;
   email: string;
-  sesso?: string;
+  sesso: string;
 }
 
 // Components
@@ -67,20 +69,30 @@ const Navbar = () => (
 const GAS_URL = import.meta.env.VITE_GAS_URL;
 
 const fetchGAS = async (params: any, body?: any) => {
-  const url = new URL(GAS_URL);
-  Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-  
-  const options: any = {
-    method: body ? 'POST' : 'GET',
-    mode: 'cors',
-  };
-  
-  if (body) {
-    options.body = JSON.stringify(body);
+  if (!GAS_URL) {
+    console.error('VITE_GAS_URL is not defined in environment variables');
+    throw new Error('Configurazione mancante: VITE_GAS_URL non trovata.');
   }
   
-  const res = await fetch(url.toString(), options);
-  return res.json();
+  try {
+    const url = new URL(GAS_URL);
+    Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+    
+    const options: any = {
+      method: body ? 'POST' : 'GET',
+      mode: 'cors',
+    };
+    
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+    
+    const res = await fetch(url.toString(), options);
+    return res.json();
+  } catch (err) {
+    console.error('Error in fetchGAS:', err);
+    throw err;
+  }
 };
 
 const Dashboard = () => {
@@ -145,6 +157,24 @@ const Dashboard = () => {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!GAS_URL) {
+    return (
+      <div className="max-w-2xl mx-auto mt-10 p-8 bg-amber-50 border border-amber-200 rounded-3xl text-center">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-amber-900 mb-2">Configurazione Mancante</h2>
+        <p className="text-amber-700 mb-6">
+          Non è stato configurato l'URL di Google Apps Script. 
+          Assicurati di aver aggiunto la variabile d'ambiente <strong>VITE_GAS_URL</strong> su Vercel o nel file .env.
+        </p>
+        <div className="bg-white p-4 rounded-xl text-left text-sm font-mono text-gray-600 border border-amber-100">
+          1. Vai su Vercel &gt; Settings &gt; Environment Variables<br/>
+          2. Aggiungi VITE_GAS_URL con l'URL del tuo script<br/>
+          3. Fai il Redeploy dell'app
+        </div>
       </div>
     );
   }
@@ -295,20 +325,28 @@ const CompanyDetail = () => {
   
   // Modal State for New Employee
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
+  const [isEditEmpModalOpen, setIsEditEmpModalOpen] = useState(false);
   const [newEmp, setNewEmp] = useState({
     nome: '',
     email: '',
     sesso: ''
   });
+  const [editingEmp, setEditingEmp] = useState<Dipendente | null>(null);
   const [empSaving, setEmpSaving] = useState(false);
   const [empError, setEmpError] = useState<string | null>(null);
 
   // Settings Modal State
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isConvocationModalOpen, setIsConvocationModalOpen] = useState(false);
   const [editCompany, setEditCompany] = useState({
     nome: '',
     logo: '',
-    indirizzo: ''
+    indirizzo: '',
+    prossimaConvocazione: ''
+  });
+  const [convocationData, setConvocationData] = useState({
+    date: '',
+    timeRange: ''
   });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -342,7 +380,8 @@ const CompanyDetail = () => {
         setEditCompany({
           nome: found.nome,
           logo: found.logo,
-          indirizzo: found.indirizzo
+          indirizzo: found.indirizzo,
+          prossimaConvocazione: found.prossimaConvocazione || ''
         });
       }
       setDipendenti(Array.isArray(dipendentiData) ? dipendentiData : []);
@@ -358,8 +397,10 @@ const CompanyDetail = () => {
     setEmpSaving(true);
     setEmpError(null);
     try {
+      const dipendenteId = "EMP-" + Math.floor(Date.now() / 1000).toString().slice(-6);
       const data = await fetchGAS({ action: 'addDipendente' }, {
         action: 'addDipendente',
+        id: dipendenteId,
         ...newEmp,
         aziendaId: id
       });
@@ -378,6 +419,90 @@ const CompanyDetail = () => {
     }
   };
 
+  const handleUpdateDipendente = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEmp) return;
+    setEmpSaving(true);
+    setEmpError(null);
+    try {
+      const data = await fetchGAS({ action: 'updateDipendente' }, {
+        action: 'updateDipendente',
+        aziendaId: id,
+        dipendenteId: editingEmp.id,
+        ...newEmp
+      });
+      if (data.success) {
+        setIsEditEmpModalOpen(false);
+        setEditingEmp(null);
+        setNewEmp({ nome: '', email: '', sesso: '' });
+        fetchDipendenti();
+      } else {
+        setEmpError(data.error || 'Errore durante l\'aggiornamento');
+      }
+    } catch (err) {
+      console.error(err);
+      setEmpError('Errore di connessione');
+    } finally {
+      setEmpSaving(false);
+    }
+  };
+
+  const handleDeleteDipendente = async (dipendenteId: string) => {
+    if (!window.confirm('Sei sicuro di voler eliminare questo dipendente?')) return;
+    try {
+      const data = await fetchGAS({ action: 'deleteDipendente' }, {
+        action: 'deleteDipendente',
+        aziendaId: id,
+        dipendenteId
+      });
+      if (data.success) {
+        fetchDipendenti();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateConvocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsSaving(true);
+    const prossimaConvocazione = `${convocationData.date} | ${convocationData.timeRange}`;
+    try {
+      const data = await fetchGAS({ action: 'updateAzienda' }, {
+        action: 'updateAzienda',
+        id,
+        ...editCompany,
+        prossimaConvocazione
+      });
+      if (data.success) {
+        setAzienda({ ...azienda!, prossimaConvocazione });
+        setIsConvocationModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const handleCancelConvocation = async () => {
+    if (!window.confirm('Annullare la prossima convocazione?')) return;
+    setSettingsSaving(true);
+    try {
+      const data = await fetchGAS({ action: 'updateAzienda' }, {
+        action: 'updateAzienda',
+        id,
+        ...editCompany,
+        prossimaConvocazione: ''
+      });
+      if (data.success) {
+        setAzienda({ ...azienda!, prossimaConvocazione: '' });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSettingsSaving(false);
+    }
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsSaving(true);
@@ -465,6 +590,7 @@ const CompanyDetail = () => {
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  if (!GAS_URL) return <div className="text-center py-20 text-amber-600 font-medium">Configurazione mancante: VITE_GAS_URL non impostata.</div>;
   if (!azienda) return <div className="text-center py-20">Azienda non trovata.</div>;
 
   return (
@@ -489,6 +615,41 @@ const CompanyDetail = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{azienda.nome}</h1>
             <p className="text-gray-500">{azienda.indirizzo || 'Indirizzo non specificato'}</p>
+            {azienda.prossimaConvocazione && (
+              <div className="mt-3 inline-flex items-center gap-3 bg-amber-50 border border-amber-100 px-4 py-2 rounded-xl">
+                <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+                  <CalendarIcon className="w-4 h-4" />
+                  <span>Prossima convocazione: <strong>{azienda.prossimaConvocazione}</strong></span>
+                </div>
+                <div className="flex gap-2 border-l border-amber-200 pl-3">
+                  <button 
+                    onClick={() => {
+                      const [d, t] = (azienda.prossimaConvocazione || '').split(' | ');
+                      setConvocationData({ date: d || '', timeRange: t || '' });
+                      setIsConvocationModalOpen(true);
+                    }}
+                    className="text-amber-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider"
+                  >
+                    Modifica
+                  </button>
+                  <button 
+                    onClick={handleCancelConvocation}
+                    className="text-red-600 hover:text-red-700 text-xs font-bold uppercase tracking-wider"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              </div>
+            )}
+            {!azienda.prossimaConvocazione && (
+              <button 
+                onClick={() => setIsConvocationModalOpen(true)}
+                className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-bold flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                Imposta prossima convocazione
+              </button>
+            )}
           </div>
         </div>
         <div className="flex gap-3">
@@ -630,6 +791,28 @@ const CompanyDetail = () => {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{d.nome}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{d.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{d.sesso || '-'}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => {
+                            setEditingEmp(d);
+                            setNewEmp({ nome: d.nome, email: d.email, sesso: d.sesso });
+                            setIsEditEmpModalOpen(true);
+                          }}
+                          className="p-2 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
+                          title="Modifica"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteDipendente(d.id)}
+                          className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                          title="Elimina"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {dipendenti.length === 0 && (
@@ -741,7 +924,185 @@ const CompanyDetail = () => {
         )}
       </AnimatePresence>
 
-      {/* Modal Impostazioni Azienda */}
+      {/* Modal Modifica Dipendente */}
+      <AnimatePresence>
+        {isEditEmpModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsEditEmpModalOpen(false);
+                setEditingEmp(null);
+                setNewEmp({ nome: '', email: '', sesso: '' });
+              }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900">Modifica Dipendente</h2>
+                  <button 
+                    onClick={() => {
+                      setIsEditEmpModalOpen(false);
+                      setEditingEmp(null);
+                      setNewEmp({ nome: '', email: '', sesso: '' });
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateDipendente} className="space-y-5">
+                  {empError && (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 shrink-0" />
+                      <span>{empError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Nome e Cognome</label>
+                    <input 
+                      required
+                      value={newEmp.nome}
+                      onChange={e => setNewEmp({...newEmp, nome: e.target.value})}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Email</label>
+                    <input 
+                      required
+                      type="email"
+                      value={newEmp.email}
+                      onChange={e => setNewEmp({...newEmp, email: e.target.value})}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Sesso</label>
+                    <select 
+                      value={newEmp.sesso}
+                      onChange={e => setNewEmp({...newEmp, sesso: e.target.value})}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="">Seleziona...</option>
+                      <option value="M">Maschio</option>
+                      <option value="F">Femmina</option>
+                      <option value="Altro">Altro</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-4 flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setIsEditEmpModalOpen(false);
+                        setEditingEmp(null);
+                        setNewEmp({ nome: '', email: '', sesso: '' });
+                      }}
+                      className="flex-1 px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      Annulla
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={empSaving}
+                      className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                    >
+                      {empSaving ? 'Salvataggio...' : 'Salva Modifiche'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Prossima Convocazione */}
+      <AnimatePresence>
+        {isConvocationModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsConvocationModalOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900">Imposta Convocazione</h2>
+                  <button 
+                    onClick={() => setIsConvocationModalOpen(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateConvocation} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Data</label>
+                    <input 
+                      required
+                      type="date"
+                      value={convocationData.date}
+                      onChange={e => setConvocationData({...convocationData, date: e.target.value})}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Fascia Oraria (es. 09:00 - 13:00)</label>
+                    <input 
+                      required
+                      placeholder="es. 09:00 - 13:00"
+                      value={convocationData.timeRange}
+                      onChange={e => setConvocationData({...convocationData, timeRange: e.target.value})}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setIsConvocationModalOpen(false)}
+                      className="flex-1 px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      Annulla
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={settingsSaving}
+                      className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                    >
+                      {settingsSaving ? 'Salvataggio...' : 'Salva'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {isSettingsModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
