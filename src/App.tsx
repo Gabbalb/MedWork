@@ -146,6 +146,9 @@ const Dashboard = () => {
   const [allSlots, setAllSlots] = useState<any[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isSlotDetailOpen, setIsSlotDetailOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [dipendentiAzienda, setDipendentiAzienda] = useState<Dipendente[]>([]);
+  const [isSlotActionLoading, setIsSlotActionLoading] = useState(false);
   const [newCompany, setNewCompany] = useState({
     nome: '',
     logo: '',
@@ -187,6 +190,61 @@ const Dashboard = () => {
     fetchAziende();
     fetchAllSlots();
   }, []);
+
+  const fetchDipendentiAzienda = async (aziendaId: string) => {
+    try {
+      const data = await fetchGAS({ action: 'getDipendenti', aziendaId });
+      if (Array.isArray(data)) {
+        setDipendentiAzienda(data.map(normalizeDipendente));
+      }
+    } catch (err) {
+      console.error('Error fetching dipendenti for azienda:', err);
+    }
+  };
+
+  const handleUpdateSlotStatus = async (newStatus: string, dipendenteId?: string) => {
+    if (!selectedSlot) return;
+    setIsSlotActionLoading(true);
+    try {
+      const data = await fetchGAS({ action: 'updateSlot' }, {
+        action: 'updateSlot',
+        aziendaId: selectedSlot.aziendaId,
+        data: selectedSlot.data,
+        inizio: selectedSlot.inizio,
+        stato: newStatus,
+        dipendenteId: dipendenteId || ''
+      });
+      if (data.success) {
+        fetchAllSlots();
+        setIsSlotDetailOpen(false);
+      }
+    } catch (err) {
+      console.error('Error updating slot:', err);
+    } finally {
+      setIsSlotActionLoading(false);
+    }
+  };
+
+  const handleDeleteSlot = async () => {
+    if (!selectedSlot || !window.confirm('Sei sicuro di voler eliminare definitivamente questo slot?')) return;
+    setIsSlotActionLoading(true);
+    try {
+      const data = await fetchGAS({ action: 'deleteSlot' }, {
+        action: 'deleteSlot',
+        aziendaId: selectedSlot.aziendaId,
+        data: selectedSlot.data,
+        inizio: selectedSlot.inizio
+      });
+      if (data.success) {
+        fetchAllSlots();
+        setIsSlotDetailOpen(false);
+      }
+    } catch (err) {
+      console.error('Error deleting slot:', err);
+    } finally {
+      setIsSlotActionLoading(false);
+    }
+  };
 
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,7 +399,10 @@ const Dashboard = () => {
               };
             }).filter(Boolean)}
             eventClick={(info) => {
-              setSelectedSlot(info.event.extendedProps);
+              const slot = info.event.extendedProps;
+              setSelectedSlot(slot);
+              setSelectedEmployeeId('');
+              fetchDipendentiAzienda(slot.aziendaId);
               setIsSlotDetailOpen(true);
             }}
             eventContent={(eventInfo) => (
@@ -418,12 +479,55 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => setIsSlotDetailOpen(false)}
-                    className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all mt-4"
-                  >
-                    Chiudi
-                  </button>
+                  {selectedSlot.stato === 'Libero' && (
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-700">Assegna a Dipendente</label>
+                        <select 
+                          value={selectedEmployeeId}
+                          onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                          <option value="">Seleziona dipendente...</option>
+                          {dipendentiAzienda.map(d => (
+                            <option key={d.id} value={d.id}>{d.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleUpdateSlotStatus('Occupato', selectedEmployeeId)}
+                        disabled={!selectedEmployeeId || isSlotActionLoading}
+                        className={cn(
+                          "w-full py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2",
+                          !selectedEmployeeId || isSlotActionLoading ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"
+                        )}
+                      >
+                        {isSlotActionLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : "Segna come Occupato"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 mt-4">
+                    <button 
+                      onClick={handleDeleteSlot}
+                      disabled={isSlotActionLoading}
+                      className="flex-1 bg-red-50 text-red-600 py-4 rounded-2xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isSlotActionLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div> : (
+                        <>
+                          <Trash2 className="w-5 h-5" />
+                          Elimina Slot
+                        </>
+                      )}
+                    </button>
+                    <button 
+                      onClick={() => setIsSlotDetailOpen(false)}
+                      className="flex-1 bg-gray-100 text-gray-900 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                    >
+                      Chiudi
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
