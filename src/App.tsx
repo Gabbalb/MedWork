@@ -209,7 +209,12 @@ const Dashboard = () => {
     fetchGAS({ action: 'getAziende' })
       .then(data => {
         if (Array.isArray(data)) {
-          setAziende(data.map(normalizeAzienda));
+          const normalizedAziende = data.map(normalizeAzienda);
+          setAziende(normalizedAziende);
+          // Pre-fetch dipendenti for all aziende to populate cache
+          normalizedAziende.forEach(az => {
+            if (az.id) fetchDipendentiAzienda(az.id);
+          });
         } else {
           console.error('API returned non-array data:', data);
           setAziende([]);
@@ -492,23 +497,30 @@ const Dashboard = () => {
               const isOccupied = slot.stato === 'Occupato';
               
               let employeeName = '';
-              if (isOccupied && slot.dipendenteEmail) {
-                for (const azId in dipendentiCache) {
-                  const emp = dipendentiCache[azId].find(d => d.email === slot.dipendenteEmail);
-                  if (emp) {
-                    employeeName = emp.nome;
-                    break;
+              if (isOccupied) {
+                if (slot.dipendenteEmail) {
+                  // Cerca nella cache
+                  for (const azId in dipendentiCache) {
+                    const emp = dipendentiCache[azId].find(d => d.email === slot.dipendenteEmail);
+                    if (emp) {
+                      employeeName = emp.nome;
+                      break;
+                    }
                   }
+                  // Fallback all'email se il nome non è in cache
+                  if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
+                } else {
+                  // Se occupato ma senza email, mostriamo "Occupato"
+                  employeeName = 'Occupato';
                 }
-                if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
               }
 
               return (
-                <div className="p-1 overflow-hidden">
-                  <div className="font-bold text-[10px] truncate">
+                <div className="p-1 overflow-hidden flex flex-col h-full">
+                  <div className="font-bold text-[10px] truncate leading-tight">
                     {isOccupied ? employeeName : eventInfo.event.title}
                   </div>
-                  <div className="text-[9px] opacity-80 truncate">
+                  <div className="text-[9px] opacity-80 truncate leading-tight mt-0.5">
                     {slot.aziendaId} • {eventInfo.timeText}
                   </div>
                 </div>
