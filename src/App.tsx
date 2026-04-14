@@ -64,32 +64,52 @@ interface Dipendente {
 
 const normalizeSlot = (s: any): Slot => {
   if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '' };
+  const getVal = (obj: any, key: string) => {
+    const target = key.toLowerCase().trim();
+    const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
+    return actualKey ? obj[actualKey] : undefined;
+  };
   return {
-    aziendaId: s.aziendaId || s['Id-Azienda'] || s['id-azienda'] || s['aziendaid'] || '',
-    data: s.data || s['Data'] || s['data'] || '',
-    inizio: s.inizio || s['Inizio'] || s['inizio'] || '',
-    fine: s.fine || s['Fine'] || s['fine'] || '',
-    durata: s.durata || s['Durata'] || s['durata'] || '',
-    stato: s.stato || s['Stato'] || s['stato'] || ''
+    aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || getVal(s, 'aziendaid') || ''),
+    data: String(getVal(s, 'Data') || getVal(s, 'data') || ''),
+    inizio: String(getVal(s, 'Inizio') || getVal(s, 'inizio') || ''),
+    fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
+    durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
+    stato: String(getVal(s, 'Stato') || getVal(s, 'stato') || '')
   };
 };
 
-const normalizeAzienda = (a: any): Azienda => ({
-  id: a.id || a['Id'] || '',
-  nome: a.nome || a['Nome'] || '',
-  logo: a.logo || a['Logo'] || '',
-  indirizzo: a.indirizzo || a['Indirizzo'] || '',
-  prossimaConvocazione: a.prossimaConvocazione || a['ProssimaConvocazione'] || ''
-});
+const normalizeAzienda = (a: any): Azienda => {
+  if (!a) return { id: '', nome: '', logo: '', indirizzo: '' };
+  const getVal = (obj: any, key: string) => {
+    const target = key.toLowerCase().trim();
+    const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
+    return actualKey ? obj[actualKey] : undefined;
+  };
+  const nome = getVal(a, 'Nome') || getVal(a, 'nome') || '';
+  const id = getVal(a, 'Id') || getVal(a, 'id') || getVal(a, 'ID') || nome;
+  return {
+    id: String(id),
+    nome: String(nome),
+    logo: String(getVal(a, 'Logo') || getVal(a, 'logo') || ''),
+    indirizzo: String(getVal(a, 'Indirizzo') || getVal(a, 'indirizzo') || ''),
+    prossimaConvocazione: String(getVal(a, 'ProssimaConvocazione') || getVal(a, 'prossimaconvocazione') || '')
+  };
+};
 
 const normalizeDipendente = (d: any): Dipendente => {
   if (!d) return { id: '', aziendaId: '', nome: '', email: '', sesso: '' };
+  const getVal = (obj: any, key: string) => {
+    const target = key.toLowerCase().trim();
+    const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
+    return actualKey ? obj[actualKey] : undefined;
+  };
   return {
-    id: d.id || d['Id'] || d['ID'] || '',
-    aziendaId: d.aziendaId || d['Id-Azienda'] || d['id-azienda'] || d['aziendaid'] || '',
-    nome: d.nome || d['Nome'] || d['nome'] || '',
-    email: d.email || d['Email'] || d['email'] || '',
-    sesso: d.sesso || d['Sesso'] || d['sesso'] || ''
+    id: String(getVal(d, 'Id') || getVal(d, 'id') || getVal(d, 'ID') || ''),
+    aziendaId: String(getVal(d, 'Id-Azienda') || getVal(d, 'aziendaId') || getVal(d, 'aziendaid') || ''),
+    nome: String(getVal(d, 'Nome') || getVal(d, 'nome') || ''),
+    email: String(getVal(d, 'Email') || getVal(d, 'email') || ''),
+    sesso: String(getVal(d, 'Sesso') || getVal(d, 'sesso') || '')
   };
 };
 
@@ -744,7 +764,15 @@ const CompanyDetail = () => {
       fetchGAS({ action: 'getSlots', aziendaId: id })
     ]).then(([aziende, dipendentiData, slotsData]) => {
       const aziendeList = Array.isArray(aziende) ? aziende.map(normalizeAzienda) : [];
-      const found = aziendeList.find((a: Azienda) => a.id === id);
+      
+      // Robust search: check ID and Name, case-insensitive and trimmed
+      const searchId = (id || '').trim().toLowerCase();
+      const found = aziendeList.find((a: Azienda) => {
+        const aId = (a.id || '').trim().toLowerCase();
+        const aNome = (a.nome || '').trim().toLowerCase();
+        return aId === searchId || aNome === searchId;
+      });
+      
       setAzienda(found || null);
       if (found) {
         setEditCompany({
@@ -758,7 +786,7 @@ const CompanyDetail = () => {
       setSlots(Array.isArray(slotsData) ? slotsData.map(normalizeSlot) : []);
       setLoading(false);
     }).catch(err => {
-      console.error(err);
+      console.error('Error in CompanyDetail:', err);
       setLoading(false);
     });
   }, [id]);
