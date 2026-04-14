@@ -55,6 +55,7 @@ interface Slot {
   durata: string;
   stato: string;
   dipendenteEmail?: string;
+  dipendenteNome?: string;
 }
 
 interface Dipendente {
@@ -90,7 +91,8 @@ const normalizeSlot = (s: any): Slot => {
     fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
     stato: stato,
-    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim()
+    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim(),
+    dipendenteNome: String(getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
   };
 };
 
@@ -287,9 +289,13 @@ const Dashboard = () => {
     setIsSlotActionLoading(true);
     
     let dipendenteEmail = '';
+    let dipendenteNome = '';
     if (dipendenteId) {
       const emp = dipendentiAzienda.find(d => d.id === dipendenteId);
-      if (emp) dipendenteEmail = emp.email;
+      if (emp) {
+        dipendenteEmail = emp.email;
+        dipendenteNome = emp.nome;
+      }
     }
 
     try {
@@ -303,7 +309,8 @@ const Dashboard = () => {
         data: slotDate,
         inizio: selectedSlot.inizio,
         stato: newStatus,
-        dipendenteEmail: dipendenteEmail
+        dipendenteEmail: dipendenteEmail,
+        dipendenteNome: dipendenteNome
       });
       if (data.success) {
         fetchAllSlots();
@@ -504,27 +511,21 @@ const Dashboard = () => {
               const slot = eventInfo.event.extendedProps as Slot;
               const isOccupied = slot.stato?.toLowerCase() === 'occupato';
               
-              let employeeName = '';
-              if (isOccupied) {
-                if (slot.dipendenteEmail) {
-                  const searchEmail = slot.dipendenteEmail.toLowerCase().trim();
-                  // Cerca nella cache
-                  for (const azId in dipendentiCache) {
-                    const list = dipendentiCache[azId];
-                    if (Array.isArray(list)) {
-                      const emp = list.find(d => d.email.toLowerCase().trim() === searchEmail);
-                      if (emp) {
-                        employeeName = emp.nome;
-                        break;
-                      }
+              let employeeName = slot.dipendenteNome || '';
+              
+              if (isOccupied && !employeeName && slot.dipendenteEmail) {
+                const searchEmail = slot.dipendenteEmail.toLowerCase().trim();
+                for (const azId in dipendentiCache) {
+                  const list = dipendentiCache[azId];
+                  if (Array.isArray(list)) {
+                    const emp = list.find(d => d.email.toLowerCase().trim() === searchEmail);
+                    if (emp) {
+                      employeeName = emp.nome;
+                      break;
                     }
                   }
-                  // Fallback all'email se il nome non è in cache
-                  if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
-                } else {
-                  // Se occupato ma senza email, mostriamo "Occupato"
-                  employeeName = 'Occupato';
                 }
+                if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
               }
 
               return (
@@ -585,7 +586,7 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  {selectedSlot.stato === 'Occupato' && selectedSlot.dipendenteEmail && (
+                  {selectedSlot.stato === 'Occupato' && (selectedSlot.dipendenteEmail || selectedSlot.dipendenteNome) && (
                     <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
                       <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Dettagli Lavoratore</p>
                       <div className="flex items-center gap-3">
@@ -595,6 +596,8 @@ const Dashboard = () => {
                         <div>
                           <p className="font-bold text-blue-900">
                             {(() => {
+                              if (selectedSlot.dipendenteNome) return selectedSlot.dipendenteNome;
+                              if (!selectedSlot.dipendenteEmail) return 'N/A';
                               const searchEmail = selectedSlot.dipendenteEmail.toLowerCase().trim();
                               for (const azId in dipendentiCache) {
                                 const emp = dipendentiCache[azId].find(d => 
@@ -605,7 +608,7 @@ const Dashboard = () => {
                               return selectedSlot.dipendenteEmail.split('@')[0];
                             })()}
                           </p>
-                          <p className="text-xs text-blue-600 font-medium">{selectedSlot.dipendenteEmail}</p>
+                          <p className="text-xs text-blue-600 font-medium">{selectedSlot.dipendenteEmail || 'Email non disponibile'}</p>
                         </div>
                       </div>
                     </div>
