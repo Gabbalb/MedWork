@@ -221,6 +221,14 @@ const Dashboard = () => {
   const handleUpdateSlotStatus = async (newStatus: string, dipendenteId?: string) => {
     if (!selectedSlot) return;
     setIsSlotActionLoading(true);
+    
+    // Find employee email if dipendenteId is provided
+    let dipendenteEmail = '';
+    if (dipendenteId) {
+      const emp = dipendentiAzienda.find(d => d.id === dipendenteId);
+      if (emp) dipendenteEmail = emp.email;
+    }
+
     try {
       const data = await fetchGAS({ action: 'updateSlot' }, {
         action: 'updateSlot',
@@ -228,7 +236,8 @@ const Dashboard = () => {
         data: selectedSlot.data,
         inizio: selectedSlot.inizio,
         stato: newStatus,
-        dipendenteId: dipendenteId || ''
+        dipendenteId: dipendenteId || '',
+        dipendenteEmail: dipendenteEmail
       });
       if (data.success) {
         fetchAllSlots();
