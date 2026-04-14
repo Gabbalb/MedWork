@@ -70,9 +70,18 @@ const normalizeSlot = (s: any): Slot => {
     const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
     return actualKey ? obj[actualKey] : undefined;
   };
+  
+  let rawData = String(getVal(s, 'Data') || getVal(s, 'data') || '');
+  // Se la data contiene 'T', è un formato ISO. Estraiamo solo la parte YYYY-MM-DD.
+  // Se però è stata spostata dal fuso orario (es. 22:00 del giorno prima), 
+  // dobbiamo stare attenti. Ma la soluzione migliore è che GAS invii già YYYY-MM-DD.
+  if (rawData.includes('T')) {
+    rawData = rawData.split('T')[0];
+  }
+
   return {
     aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || ''),
-    data: String(getVal(s, 'Data') || getVal(s, 'data') || ''),
+    data: rawData,
     inizio: String(getVal(s, 'Inizio') || getVal(s, 'inizio') || ''),
     fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
@@ -261,8 +270,9 @@ const Dashboard = () => {
     }
 
     try {
-      // Ensure date is in YYYY-MM-DD format for GAS
-      const slotDate = selectedSlot.data.includes('T') ? selectedSlot.data.split('T')[0] : selectedSlot.data;
+      // Pulizia drastica della data: prendiamo solo i primi 10 caratteri (YYYY-MM-DD)
+      // Questo evita che "2026-04-14" diventi "2026-04-13T22:00..."
+      const slotDate = selectedSlot.data.substring(0, 10);
       
       const data = await fetchGAS({ action: 'updateSlot' }, {
         action: 'updateSlot',
@@ -981,9 +991,12 @@ const CompanyDetail = () => {
       const slotEnd = addMinutes(current, duration);
       if (isAfter(slotEnd, end)) break;
 
+      // Assicuriamoci che 'date' sia una stringa YYYY-MM-DD pulita
+      const cleanDate = typeof date === 'string' ? date.split('T')[0] : format(date, 'yyyy-MM-dd');
+
       slots.push([
         azienda.id, // This is the ID (Name or Name01)
-        date,
+        cleanDate,
         format(current, 'HH:mm'),
         format(slotEnd, 'HH:mm'),
         duration.toString(),
