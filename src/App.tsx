@@ -131,12 +131,15 @@ const fetchGAS = async (params: any, body?: any) => {
     };
     
     if (body) {
-      // We use text/plain to avoid CORS preflight (OPTIONS request)
-      // which Google Apps Script does not support.
-      options.body = JSON.stringify(body);
-      options.headers = {
-        'Content-Type': 'text/plain;charset=utf-8'
-      };
+      // Using URLSearchParams for POST body is often more reliable with GAS
+      // as it populates e.parameter in the doPost(e) function.
+      const formData = new URLSearchParams();
+      Object.keys(body).forEach(key => {
+        const value = body[key];
+        formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+      });
+      options.body = formData;
+      // Content-Type is automatically set to application/x-www-form-urlencoded
     }
     
     const res = await fetch(url.toString(), options);
