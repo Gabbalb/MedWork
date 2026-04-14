@@ -198,6 +198,7 @@ const Dashboard = () => {
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [isSlotDetailOpen, setIsSlotDetailOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [isEditingEmployee, setIsEditingEmployee] = useState(false);
   const [dipendentiAzienda, setDipendentiAzienda] = useState<Dipendente[]>([]);
   const [isDipendentiLoading, setIsDipendentiLoading] = useState(false);
   const [isSlotActionLoading, setIsSlotActionLoading] = useState(false);
@@ -315,6 +316,7 @@ const Dashboard = () => {
       if (data.success) {
         fetchAllSlots();
         setIsSlotDetailOpen(false);
+        setIsEditingEmployee(false);
       } else {
         console.error('Update slot failed:', data.error);
         alert('Errore: ' + (data.error || 'Impossibile aggiornare lo slot'));
@@ -503,6 +505,7 @@ const Dashboard = () => {
               const slot = info.event.extendedProps;
               setSelectedSlot(slot);
               setSelectedEmployeeId('');
+              setIsEditingEmployee(false);
               fetchDipendentiAzienda(slot.aziendaId);
               setIsSlotDetailOpen(true);
             }}
@@ -587,29 +590,78 @@ const Dashboard = () => {
 
                   {selectedSlot.stato === 'Occupato' && (selectedSlot.dipendenteEmail || selectedSlot.dipendenteNome) && (
                     <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                      <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Dettagli Lavoratore</p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                          <User className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-blue-900">
-                            {(() => {
-                              if (selectedSlot.dipendenteNome) return selectedSlot.dipendenteNome;
-                              if (!selectedSlot.dipendenteEmail) return 'N/A';
-                              const searchEmail = selectedSlot.dipendenteEmail.toLowerCase().trim();
-                              for (const azId in dipendentiCache) {
-                                const emp = dipendentiCache[azId].find(d => 
-                                  d.email.toLowerCase().trim() === searchEmail
-                                );
-                                if (emp) return emp.nome;
-                              }
-                              return selectedSlot.dipendenteEmail.split('@')[0];
-                            })()}
-                          </p>
-                          <p className="text-xs text-blue-600 font-medium">{selectedSlot.dipendenteEmail || 'Email non disponibile'}</p>
-                        </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-blue-400 uppercase tracking-wider">Dettagli Lavoratore</p>
+                        {!isEditingEmployee && (
+                          <button 
+                            onClick={() => {
+                              setIsEditingEmployee(true);
+                              // Trova l'ID del dipendente attuale se possibile
+                              const currentEmp = dipendentiAzienda.find(d => 
+                                d.email.toLowerCase().trim() === selectedSlot.dipendenteEmail?.toLowerCase().trim()
+                              );
+                              if (currentEmp) setSelectedEmployeeId(currentEmp.id);
+                            }}
+                            className="p-1 hover:bg-blue-100 rounded-lg transition-colors text-blue-600"
+                            title="Modifica lavoratore"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
+                      
+                      {isEditingEmployee ? (
+                        <div className="space-y-3">
+                          <select 
+                            value={selectedEmployeeId}
+                            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                            className="w-full p-3 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm font-medium"
+                          >
+                            <option value="">Seleziona un altro dipendente...</option>
+                            {dipendentiAzienda.map(emp => (
+                              <option key={emp.id} value={emp.id}>{emp.nome} ({emp.email})</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateSlotStatus('Occupato', selectedEmployeeId)}
+                              disabled={!selectedEmployeeId || isSlotActionLoading}
+                              className="flex-1 bg-blue-600 text-white py-2 rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-all"
+                            >
+                              {isSlotActionLoading ? 'Salvataggio...' : 'Conferma Modifica'}
+                            </button>
+                            <button
+                              onClick={() => setIsEditingEmployee(false)}
+                              className="px-4 py-2 bg-white border border-blue-200 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-50 transition-all"
+                            >
+                              Annulla
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                            <User className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-blue-900">
+                              {(() => {
+                                if (selectedSlot.dipendenteNome) return selectedSlot.dipendenteNome;
+                                if (!selectedSlot.dipendenteEmail) return 'N/A';
+                                const searchEmail = selectedSlot.dipendenteEmail.toLowerCase().trim();
+                                for (const azId in dipendentiCache) {
+                                  const emp = dipendentiCache[azId].find(d => 
+                                    d.email.toLowerCase().trim() === searchEmail
+                                  );
+                                  if (emp) return emp.nome;
+                                }
+                                return selectedSlot.dipendenteEmail.split('@')[0];
+                              })()}
+                            </p>
+                            <p className="text-xs text-blue-600 font-medium">{selectedSlot.dipendenteEmail || 'Email non disponibile'}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
