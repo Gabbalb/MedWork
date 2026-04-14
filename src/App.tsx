@@ -503,6 +503,8 @@ const CompanyDetail = () => {
     } finally {
       setSettingsSaving(false);
     }
+  };
+
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsSaving(true);
