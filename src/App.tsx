@@ -62,6 +62,34 @@ interface Dipendente {
   sesso: string;
 }
 
+const normalizeSlot = (s: any): Slot => {
+  if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '' };
+  return {
+    aziendaId: s.aziendaId || s['Id-Azienda'] || s['id-azienda'] || s['aziendaid'] || '',
+    data: s.data || s['Data'] || s['data'] || '',
+    inizio: s.inizio || s['Inizio'] || s['inizio'] || '',
+    fine: s.fine || s['Fine'] || s['fine'] || '',
+    durata: s.durata || s['Durata'] || s['durata'] || '',
+    stato: s.stato || s['Stato'] || s['stato'] || ''
+  };
+};
+
+const normalizeAzienda = (a: any): Azienda => ({
+  id: a.id || a['Id'] || '',
+  nome: a.nome || a['Nome'] || '',
+  logo: a.logo || a['Logo'] || '',
+  indirizzo: a.indirizzo || a['Indirizzo'] || '',
+  prossimaConvocazione: a.prossimaConvocazione || a['ProssimaConvocazione'] || ''
+});
+
+const normalizeDipendente = (d: any): Dipendente => ({
+  id: d.id || d['Id'] || '',
+  aziendaId: d.aziendaId || d['Id-Azienda'] || '',
+  nome: d.nome || d['Nome'] || '',
+  email: d.email || d['Email'] || '',
+  sesso: d.sesso || d['Sesso'] || ''
+});
+
 // Components
 const Navbar = () => (
   <nav className="border-b border-gray-200 bg-white sticky top-0 z-50">
@@ -131,7 +159,7 @@ const Dashboard = () => {
     fetchGAS({ action: 'getAziende' })
       .then(data => {
         if (Array.isArray(data)) {
-          setAziende(data);
+          setAziende(data.map(normalizeAzienda));
         } else {
           console.error('API returned non-array data:', data);
           setAziende([]);
@@ -148,7 +176,7 @@ const Dashboard = () => {
     try {
       const data = await fetchGAS({ action: 'getAllSlots' });
       if (Array.isArray(data)) {
-        setAllSlots(data);
+        setAllSlots(data.map(normalizeSlot));
       }
     } catch (err) {
       console.error('Error fetching all slots:', err);
@@ -291,7 +319,8 @@ const Dashboard = () => {
             slotMaxTime="20:00:00"
             allDaySlot={false}
             height="auto"
-            events={allSlots.map(slot => {
+            events={allSlots.map(s => {
+              const slot = normalizeSlot(s);
               const azienda = aziende.find(a => a.id === slot.aziendaId);
               const dateObj = new Date(slot.data);
               
@@ -543,7 +572,7 @@ const CompanyDetail = () => {
   const fetchDipendenti = () => {
     fetchGAS({ action: 'getDipendenti', aziendaId: id })
       .then(data => {
-        setDipendenti(Array.isArray(data) ? data : []);
+        setDipendenti(Array.isArray(data) ? data.map(normalizeDipendente) : []);
       })
       .catch(err => console.error(err));
   };
@@ -551,7 +580,7 @@ const CompanyDetail = () => {
   const fetchSlots = () => {
     fetchGAS({ action: 'getSlots', aziendaId: id })
       .then(data => {
-        setSlots(Array.isArray(data) ? data : []);
+        setSlots(Array.isArray(data) ? data.map(normalizeSlot) : []);
       })
       .catch(err => console.error(err));
   };
@@ -563,7 +592,7 @@ const CompanyDetail = () => {
       fetchGAS({ action: 'getDipendenti', aziendaId: id }),
       fetchGAS({ action: 'getSlots', aziendaId: id })
     ]).then(([aziende, dipendentiData, slotsData]) => {
-      const aziendeList = Array.isArray(aziende) ? aziende : [];
+      const aziendeList = Array.isArray(aziende) ? aziende.map(normalizeAzienda) : [];
       const found = aziendeList.find((a: Azienda) => a.id === id);
       setAzienda(found || null);
       if (found) {
@@ -574,8 +603,8 @@ const CompanyDetail = () => {
           prossimaConvocazione: found.prossimaConvocazione || ''
         });
       }
-      setDipendenti(Array.isArray(dipendentiData) ? dipendentiData : []);
-      setSlots(Array.isArray(slotsData) ? slotsData : []);
+      setDipendenti(Array.isArray(dipendentiData) ? dipendentiData.map(normalizeDipendente) : []);
+      setSlots(Array.isArray(slotsData) ? slotsData.map(normalizeSlot) : []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
