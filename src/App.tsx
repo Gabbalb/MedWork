@@ -369,6 +369,7 @@ const CompanyDetail = () => {
   const [duration, setDuration] = useState(30);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [originalDate, setOriginalDate] = useState('');
 
   const fetchDipendenti = () => {
     fetchGAS({ action: 'getDipendenti', aziendaId: id })
@@ -605,11 +606,12 @@ const CompanyDetail = () => {
       const data = await fetchGAS({ action: 'addDisponibilita' }, {
         action: 'addDisponibilita',
         aziendaId: azienda.id,
-        date: date, // Explicit date for overwrite
+        date: originalDate || date, // Use original date to overwrite if it changed
         slots
       });
       if (data.success) {
         setSuccess(true);
+        setOriginalDate(date); // Update original date to new date
         fetchSlots();
         setTimeout(() => setSuccess(false), 3000);
       }
@@ -627,22 +629,32 @@ const CompanyDetail = () => {
   // Calculate next convocation from slots
   const nextConvocation = slots.length > 0 ? (() => {
     const sortedSlots = [...slots].sort((a, b) => {
-      const dateA = new Date(`${a.data}T${a.inizio}`);
-      const dateB = new Date(`${b.data}T${b.inizio}`);
+      // Normalize date string (handle ISO strings from GAS)
+      const dateAStr = a.data.includes('T') ? a.data.split('T')[0] : a.data;
+      const dateBStr = b.data.includes('T') ? b.data.split('T')[0] : b.data;
+      const dateA = new Date(`${dateAStr}T${a.inizio}`);
+      const dateB = new Date(`${dateBStr}T${b.inizio}`);
       return dateA.getTime() - dateB.getTime();
     });
     
     // Group slots by date
-    const firstDate = sortedSlots[0].data;
-    const sameDateSlots = sortedSlots.filter(s => s.data === firstDate);
+    const firstDateRaw = sortedSlots[0].data;
+    const firstDateStr = firstDateRaw.includes('T') ? firstDateRaw.split('T')[0] : firstDateRaw;
+    const sameDateSlots = sortedSlots.filter(s => {
+      const sDateStr = s.data.includes('T') ? s.data.split('T')[0] : s.data;
+      return sDateStr === firstDateStr;
+    });
     
     const startTime = sameDateSlots[0].inizio;
     const endTime = sameDateSlots[sameDateSlots.length - 1].fine;
+    const duration = sameDateSlots[0].durata;
     
     return {
-      date: format(new Date(firstDate), 'dd/MM/yyyy'),
+      date: format(parse(firstDateStr, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy'),
+      rawDate: firstDateStr,
       start: startTime,
-      end: endTime
+      end: endTime,
+      duration: duration
     };
   })() : null;
 
@@ -677,12 +689,14 @@ const CompanyDetail = () => {
                 <div className="flex gap-2 border-l border-amber-200 pl-3">
                   <button 
                     onClick={() => {
-                      // Set generator state to current convocation values
-                      const [d, m, y] = nextConvocation.date.split('/');
-                      setDate(`${y}-${m}-${d}`);
-                      setStartTime(nextConvocation.start);
-                      setEndTime(nextConvocation.end);
-                      setIsConvocationModalOpen(true);
+                      if (nextConvocation) {
+                        setDate(nextConvocation.rawDate);
+                        setOriginalDate(nextConvocation.rawDate);
+                        setStartTime(nextConvocation.start);
+                        setEndTime(nextConvocation.end);
+                        setDuration(parseInt(nextConvocation.duration) || 30);
+                        setIsConvocationModalOpen(true);
+                      }
                     }}
                     className="text-amber-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wider"
                   >
@@ -1219,7 +1233,7 @@ const CompanyDetail = () => {
                     
                     <button 
                       onClick={async () => {
-                        await handleDeleteConvocation(date);
+                        await handleDeleteConvocation(originalDate || date);
                         setIsConvocationModalOpen(false);
                       }}
                       disabled={saving}
