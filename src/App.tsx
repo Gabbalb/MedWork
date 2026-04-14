@@ -64,6 +64,25 @@ const Navbar = () => (
   </nav>
 );
 
+const GAS_URL = import.meta.env.VITE_GAS_URL;
+
+const fetchGAS = async (params: any, body?: any) => {
+  const url = new URL(GAS_URL);
+  Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+  
+  const options: any = {
+    method: body ? 'POST' : 'GET',
+    mode: 'cors',
+  };
+  
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+  
+  const res = await fetch(url.toString(), options);
+  return res.json();
+};
+
 const Dashboard = () => {
   const [aziende, setAziende] = useState<Azienda[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,8 +97,7 @@ const Dashboard = () => {
 
   const fetchAziende = () => {
     setLoading(true);
-    fetch('/api/aziende')
-      .then(res => res.json())
+    fetchGAS({ action: 'getAziende' })
       .then(data => {
         if (Array.isArray(data)) {
           setAziende(data);
@@ -104,18 +122,16 @@ const Dashboard = () => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/aziende', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCompany)
+      const data = await fetchGAS({ action: 'addAzienda' }, {
+        action: 'addAzienda',
+        ...newCompany
       });
-      const data = await res.json();
-      if (res.ok) {
+      if (data.success) {
         setIsModalOpen(false);
         setNewCompany({ nome: '', logo: '', indirizzo: '' });
         fetchAziende();
       } else {
-        setError(data.details || data.error || 'Errore durante il salvataggio');
+        setError(data.error || 'Errore durante il salvataggio');
       }
     } catch (err) {
       console.error(err);
@@ -306,8 +322,7 @@ const CompanyDetail = () => {
   const [success, setSuccess] = useState(false);
 
   const fetchDipendenti = () => {
-    fetch(`/api/dipendenti/${id}`)
-      .then(res => res.json())
+    fetchGAS({ action: 'getDipendenti', aziendaId: id })
       .then(data => {
         setDipendenti(Array.isArray(data) ? data : []);
       })
@@ -317,8 +332,8 @@ const CompanyDetail = () => {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch('/api/aziende').then(res => res.json()),
-      fetch(`/api/dipendenti/${id}`).then(res => res.json())
+      fetchGAS({ action: 'getAziende' }),
+      fetchGAS({ action: 'getDipendenti', aziendaId: id })
     ]).then(([aziende, dipendentiData]) => {
       const aziendeList = Array.isArray(aziende) ? aziende : [];
       const found = aziendeList.find((a: Azienda) => a.id === id);
@@ -343,18 +358,17 @@ const CompanyDetail = () => {
     setEmpSaving(true);
     setEmpError(null);
     try {
-      const res = await fetch('/api/dipendenti', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newEmp, aziendaId: id })
+      const data = await fetchGAS({ action: 'addDipendente' }, {
+        action: 'addDipendente',
+        ...newEmp,
+        aziendaId: id
       });
-      const data = await res.json();
-      if (res.ok) {
+      if (data.success) {
         setIsEmpModalOpen(false);
         setNewEmp({ nome: '', email: '', sesso: '' });
         fetchDipendenti();
       } else {
-        setEmpError(data.details || data.error || 'Errore durante il salvataggio');
+        setEmpError(data.error || 'Errore durante il salvataggio');
       }
     } catch (err) {
       console.error(err);
@@ -369,16 +383,15 @@ const CompanyDetail = () => {
     setSettingsSaving(true);
     setSettingsError(null);
     try {
-      const res = await fetch(`/api/aziende/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editCompany)
+      const data = await fetchGAS({ action: 'updateAzienda' }, {
+        action: 'updateAzienda',
+        id,
+        ...editCompany
       });
-      if (res.ok) {
+      if (data.success) {
         setAzienda({ ...azienda!, ...editCompany });
         setIsSettingsModalOpen(false);
       } else {
-        const data = await res.json();
         setSettingsError(data.error || 'Errore durante l\'aggiornamento');
       }
     } catch (err) {
@@ -394,13 +407,13 @@ const CompanyDetail = () => {
     
     setSettingsSaving(true);
     try {
-      const res = await fetch(`/api/aziende/${id}`, {
-        method: 'DELETE'
+      const data = await fetchGAS({ action: 'deleteAzienda' }, {
+        action: 'deleteAzienda',
+        id
       });
-      if (res.ok) {
+      if (data.success) {
         navigate('/');
       } else {
-        const data = await res.json();
         setSettingsError(data.error || 'Errore durante l\'eliminazione');
       }
     } catch (err) {
@@ -435,12 +448,12 @@ const CompanyDetail = () => {
     }
 
     try {
-      const res = await fetch('/api/disponibilita', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aziendaId: azienda.id, slots })
+      const data = await fetchGAS({ action: 'addDisponibilita' }, {
+        action: 'addDisponibilita',
+        aziendaId: azienda.id,
+        slots
       });
-      if (res.ok) {
+      if (data.success) {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }
