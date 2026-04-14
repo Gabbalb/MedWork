@@ -52,6 +52,7 @@ interface Slot {
   fine: string;
   durata: string;
   stato: string;
+  dipendenteEmail?: string;
 }
 
 interface Dipendente {
@@ -63,19 +64,20 @@ interface Dipendente {
 }
 
 const normalizeSlot = (s: any): Slot => {
-  if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '' };
+  if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '', dipendenteEmail: '' };
   const getVal = (obj: any, key: string) => {
     const target = key.toLowerCase().trim();
     const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
     return actualKey ? obj[actualKey] : undefined;
   };
   return {
-    aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || getVal(s, 'aziendaid') || ''),
+    aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || ''),
     data: String(getVal(s, 'Data') || getVal(s, 'data') || ''),
     inizio: String(getVal(s, 'Inizio') || getVal(s, 'inizio') || ''),
     fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
     durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
-    stato: String(getVal(s, 'Stato') || getVal(s, 'stato') || '')
+    stato: String(getVal(s, 'Stato') || getVal(s, 'stato') || ''),
+    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || '')
   };
 };
 
@@ -86,11 +88,9 @@ const normalizeAzienda = (a: any): Azienda => {
     const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
     return actualKey ? obj[actualKey] : undefined;
   };
-  const nome = getVal(a, 'Nome') || getVal(a, 'nome') || '';
-  const id = getVal(a, 'Id') || getVal(a, 'id') || getVal(a, 'ID') || nome;
   return {
-    id: String(id),
-    nome: String(nome),
+    id: String(getVal(a, 'ID') || getVal(a, 'id') || ''),
+    nome: String(getVal(a, 'Nome') || getVal(a, 'nome') || ''),
     logo: String(getVal(a, 'Logo') || getVal(a, 'logo') || ''),
     indirizzo: String(getVal(a, 'Indirizzo') || getVal(a, 'indirizzo') || ''),
     prossimaConvocazione: String(getVal(a, 'ProssimaConvocazione') || getVal(a, 'prossimaconvocazione') || '')
@@ -105,10 +105,10 @@ const normalizeDipendente = (d: any): Dipendente => {
     return actualKey ? obj[actualKey] : undefined;
   };
   return {
-    id: String(getVal(d, 'Id') || getVal(d, 'id') || getVal(d, 'ID') || ''),
-    aziendaId: String(getVal(d, 'Id-Azienda') || getVal(d, 'aziendaId') || getVal(d, 'aziendaid') || ''),
+    id: String(getVal(d, 'ID') || getVal(d, 'id') || ''),
+    aziendaId: String(d.aziendaId || ''),
     nome: String(getVal(d, 'Nome') || getVal(d, 'nome') || ''),
-    email: String(getVal(d, 'Email') || getVal(d, 'email') || ''),
+    email: String(getVal(d, 'Mail') || getVal(d, 'mail') || getVal(d, 'Email') || getVal(d, 'email') || ''),
     sesso: String(getVal(d, 'Sesso') || getVal(d, 'sesso') || '')
   };
 };
@@ -800,7 +800,9 @@ const CompanyDetail = () => {
       const data = await fetchGAS({ action: 'addDipendente' }, {
         action: 'addDipendente',
         id: dipendenteId,
-        ...newEmp,
+        nome: newEmp.nome,
+        email: newEmp.email,
+        sesso: newEmp.sesso,
         aziendaId: id
       });
       if (data.success) {
@@ -969,7 +971,7 @@ const CompanyDetail = () => {
       if (isAfter(slotEnd, end)) break;
 
       slots.push([
-        azienda.id,
+        azienda.id, // This is the ID (Name or Name01)
         date,
         format(current, 'HH:mm'),
         format(slotEnd, 'HH:mm'),
@@ -980,15 +982,13 @@ const CompanyDetail = () => {
     }
 
     try {
-      const data = await fetchGAS({ action: 'addDisponibilita' }, {
-        action: 'addDisponibilita',
-        aziendaId: azienda.id,
-        date: originalDate || date, // Use original date to overwrite if it changed
-        slots
+      const data = await fetchGAS({ action: 'addSlots' }, {
+        action: 'addSlots',
+        slots: slots
       });
       if (data.success) {
         setSuccess(true);
-        setOriginalDate(date); // Update original date to new date
+        setOriginalDate(date);
         fetchSlots();
         setTimeout(() => setSuccess(false), 3000);
       }
