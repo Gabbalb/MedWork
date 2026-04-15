@@ -24,7 +24,10 @@ function handleRequest(e) {
     else if (action === 'addSlots') result = addSlots(JSON.parse(e.parameter.slots));
     else if (action === 'updateSlot') result = updateSlot(e.parameter);
     else if (action === 'deleteSlot') result = deleteSlot(e.parameter);
-    else if (action === 'sendInvitations') result = sendInvitations(e.parameter.aziendaId);
+    else if (action === 'sendInvitations') {
+      var emails = e.parameter.emailsToInvite ? JSON.parse(e.parameter.emailsToInvite) : null;
+      result = sendInvitations(e.parameter.aziendaId, emails);
+    }
     else throw new Error("Azione '" + action + "' non riconosciuta.");
     
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -174,11 +177,19 @@ function getAllSlots() {
 
 // --- LOGICA EMAIL ---
 
-function sendInvitations(aziendaId) {
+function sendInvitations(aziendaId, emailsToInvite) {
   var dipendenti = getDipendenti(aziendaId);
   var aziendaNome = getAziendaNome(aziendaId);
   var count = 0;
   var errors = [];
+  
+  // Se emailsToInvite è fornito, filtriamo i dipendenti
+  if (emailsToInvite && Array.isArray(emailsToInvite) && emailsToInvite.length > 0) {
+    dipendenti = dipendenti.filter(function(d) {
+      var email = (d.Mail || d.mail || d.Email || d.email || "").toString().trim().toLowerCase();
+      return emailsToInvite.map(function(e) { return e.toLowerCase().trim(); }).indexOf(email) !== -1;
+    });
+  }
   
   dipendenti.forEach(function(d) {
     var email = (d.Mail || d.mail || d.Email || d.email || "").toString().trim();

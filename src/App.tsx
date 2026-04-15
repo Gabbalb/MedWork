@@ -922,11 +922,15 @@ const CompanyDetail = () => {
   const [originalDate, setOriginalDate] = useState('');
   const [inviting, setInviting] = useState(false);
   const [invitationSuccess, setInvitationSuccess] = useState<string | null>(null);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
 
   const fetchDipendenti = () => {
     fetchGAS({ action: 'getDipendenti', aziendaId: id })
       .then(data => {
-        setDipendenti(Array.isArray(data) ? data.map(normalizeDipendente) : []);
+        const normalized = Array.isArray(data) ? data.map(normalizeDipendente) : [];
+        setDipendenti(normalized);
+        // Pre-seleziona tutti i dipendenti per default
+        setSelectedEmails(normalized.map(d => d.email));
       })
       .catch(err => console.error(err));
   };
@@ -965,7 +969,9 @@ const CompanyDetail = () => {
           prossimaConvocazione: found.prossimaConvocazione || ''
         });
       }
-      setDipendenti(Array.isArray(dipendentiData) ? dipendentiData.map(normalizeDipendente) : []);
+      const normalizedDipendenti = Array.isArray(dipendentiData) ? dipendentiData.map(normalizeDipendente) : [];
+      setDipendenti(normalizedDipendenti);
+      setSelectedEmails(normalizedDipendenti.map(d => d.email));
       setSlots(Array.isArray(slotsData) ? slotsData.map(normalizeSlot) : []);
       setLoading(false);
     }).catch(err => {
@@ -1192,11 +1198,19 @@ const CompanyDetail = () => {
   };
 
   const handleSendInvitations = async () => {
-    if (!window.confirm("Sei sicuro di voler inviare gli inviti a tutti i dipendenti di questa azienda?")) return;
+    if (selectedEmails.length === 0) {
+      alert("Seleziona almeno un dipendente da invitare.");
+      return;
+    }
+    if (!window.confirm(`Sei sicuro di voler inviare gli inviti a ${selectedEmails.length} dipendenti selezionati?`)) return;
     setInviting(true);
     setInvitationSuccess(null);
     try {
-      const res = await fetchGAS({ action: 'sendInvitations', aziendaId: id });
+      const res = await fetchGAS({ 
+        action: 'sendInvitations', 
+        aziendaId: id,
+        emailsToInvite: JSON.stringify(selectedEmails)
+      });
       if (res.success) {
         setInvitationSuccess(`Inviti inviati con successo a ${res.sent} dipendenti!`);
         setTimeout(() => setInvitationSuccess(null), 5000);
@@ -1312,14 +1326,14 @@ const CompanyDetail = () => {
             disabled={inviting}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all",
-              inviting 
+              inviting || selectedEmails.length === 0
                 ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
                 : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
             )}
-            title="Invia inviti via email a tutti i dipendenti"
+            title="Invia inviti via email ai dipendenti selezionati"
           >
             <Mail className="w-4 h-4" />
-            {inviting ? "Invio in corso..." : "Invia Inviti"}
+            {inviting ? "Invio in corso..." : `Invia Inviti (${selectedEmails.length})`}
           </button>
           <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
             <Users className="w-4 h-4" />
@@ -1448,6 +1462,20 @@ const CompanyDetail = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      checked={dipendenti.length > 0 && selectedEmails.length === dipendenti.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedEmails(dipendenti.map(d => d.email));
+                        } else {
+                          setSelectedEmails([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nome</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sesso</th>
@@ -1455,7 +1483,21 @@ const CompanyDetail = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {dipendenti.map((d, i) => (
-                  <tr key={i} className="hover:bg-gray-50 transition-colors">
+                  <tr key={i} className={cn("hover:bg-gray-50 transition-colors", selectedEmails.includes(d.email) ? "bg-blue-50/30" : "")}>
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedEmails.includes(d.email)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedEmails([...selectedEmails, d.email]);
+                          } else {
+                            setSelectedEmails(selectedEmails.filter(email => email !== d.email));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{d.nome}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{d.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{d.sesso || '-'}</td>
