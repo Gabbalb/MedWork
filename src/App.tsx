@@ -4,7 +4,7 @@
 
  */
 
-import { BrowserRouter, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
@@ -1847,18 +1847,224 @@ const CompanyDetail = () => {
   );
 };
 
+const BookingView = ({ token }: { token: string }) => {
+  const info = React.useMemo(() => {
+    try {
+      const decoded = atob(token);
+      const [aziendaId, dipendenteId, dipendenteNome, dipendenteEmail] = decoded.split('|');
+      return { aziendaId, dipendenteId, dipendenteNome, dipendenteEmail };
+    } catch (e) {
+      return null;
+    }
+  }, [token]);
+
+  const [allSlots, setAllSlots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const fetchSlots = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchGAS({ action: 'getAllSlots' });
+      if (Array.isArray(data)) {
+        setAllSlots(data.map(normalizeSlot));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (info) fetchSlots();
+  }, [info]);
+
+  if (!info) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-gray-50">
+        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Link non valido</h1>
+        <p className="text-gray-600">Il link utilizzato non è corretto o è scaduto.</p>
+      </div>
+    );
+  }
+
+  const companySlots = allSlots.filter(s => s.aziendaId === info.aziendaId);
+  const myBooking = companySlots.find(s => s.dipendenteEmail === info.dipendenteEmail);
+
+  const handleBook = async (slot: any) => {
+    if (bookingLoading) return;
+    setBookingLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetchGAS({
+        action: 'updateSlot',
+        aziendaId: info.aziendaId,
+        data: slot.data,
+        inizio: slot.inizio,
+        stato: 'Occupato',
+        dipendenteEmail: info.dipendenteEmail,
+        dipendenteNome: info.dipendenteNome
+      });
+
+      if (res.success) {
+        if (myBooking && (myBooking.data !== slot.data || myBooking.inizio !== slot.inizio)) {
+          await fetchGAS({
+            action: 'updateSlot',
+            aziendaId: info.aziendaId,
+            data: myBooking.data,
+            inizio: myBooking.inizio,
+            stato: 'Libero',
+            dipendenteEmail: '',
+            dipendenteNome: ''
+          });
+        }
+        setMessage({ type: 'success', text: 'Prenotazione confermata! Riceverai una mail di conferma.' });
+        fetchSlots();
+      } else {
+        setMessage({ type: 'error', text: 'Errore: ' + (res.error || 'Riprova più tardi.') });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Errore di connessione. Riprova.' });
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-blue-600 p-6 text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <CalendarIcon className="w-6 h-6" />
+              <h1 className="text-xl font-bold">Prenotazione Visita Medica</h1>
+            </div>
+            <p className="text-blue-100">Ciao <strong>{info.dipendenteNome}</strong>, seleziona uno slot per la tua visita presso <strong>{info.aziendaId}</strong>.</p>
+          </div>
+
+          <div className="p-6">
+            {message && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={clsx(
+                  "p-4 rounded-xl flex items-center gap-3 mb-6",
+                  message.type === 'success' ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"
+                )}
+              >
+                {message.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                <p className="text-sm font-medium">{message.text}</p>
+              </motion.div>
+            )}
+
+            {myBooking && (
+              <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <h2 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  La tua prenotazione attuale:
+                </h2>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-lg font-bold text-blue-900">
+                      {format(new Date(myBooking.data), 'EEEE d MMMM')}
+                    </p>
+                    <p className="text-blue-700">{myBooking.inizio} - {myBooking.fine}</p>
+                  </div>
+                  <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                    Confermata
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Slot disponibili</h3>
+            
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {companySlots.filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio)).length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">Nessuno slot disponibile al momento.</p>
+                ) : (
+                  companySlots
+                    .filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio))
+                    .sort((a, b) => new Date(a.data + 'T' + a.inizio).getTime() - new Date(b.data + 'T' + b.inizio).getTime())
+                    .map((slot, idx) => {
+                      const isCurrent = myBooking && slot.data === myBooking.data && slot.inizio === myBooking.inizio;
+                      return (
+                        <button
+                          key={idx}
+                          disabled={isCurrent || bookingLoading}
+                          onClick={() => handleBook(slot)}
+                          className={clsx(
+                            "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left",
+                            isCurrent 
+                              ? "bg-blue-50 border-blue-200 cursor-default" 
+                              : "bg-white border-gray-200 hover:border-blue-400 hover:shadow-md active:scale-[0.98]"
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={clsx(
+                              "w-12 h-12 rounded-lg flex flex-col items-center justify-center",
+                              isCurrent ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
+                            )}>
+                              <span className="text-[10px] font-bold uppercase leading-none">{format(new Date(slot.data), 'MMM')}</span>
+                              <span className="text-lg font-bold leading-none">{format(new Date(slot.data), 'd')}</span>
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900">{format(new Date(slot.data), 'EEEE')}</p>
+                              <p className="text-sm text-gray-500">{slot.inizio} - {slot.fine}</p>
+                            </div>
+                          </div>
+                          {!isCurrent && (
+                            <div className="text-blue-600 font-bold text-sm flex items-center gap-1">
+                              {bookingLoading ? '...' : 'Prenota'}
+                              <ChevronRight className="w-4 h-4" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="text-center text-xs text-gray-400">
+          MedWork Manager &copy; 2024 - Sistema di gestione visite mediche
+        </p>
+      </div>
+    </div>
+  );
+};
+
+function AppContent() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  const isBookingMode = !!token;
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      {!isBookingMode && <Navbar />}
+      <main className={isBookingMode ? "" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10"}>
+        <Routes>
+          <Route path="/" element={isBookingMode ? <BookingView token={token} /> : <Dashboard />} />
+          <Route path="/azienda/:id" element={<CompanyDetail />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
-        <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/azienda/:id" element={<CompanyDetail />} />
-          </Routes>
-        </main>
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }
