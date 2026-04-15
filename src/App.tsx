@@ -2048,23 +2048,23 @@ const BookingView = ({ token }: { token: string }) => {
             </AnimatePresence>
 
             {myBooking && !message && (
-              <div className="mb-10 p-6 bg-blue-50 rounded-3xl border-2 border-blue-200 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-3 opacity-10">
-                  <CalendarIcon className="w-20 h-20" />
-                </div>
-                <h2 className="text-xs font-black text-blue-900 mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">
-                  <Clock className="w-4 h-4" />
-                  La tua prenotazione attuale:
-                </h2>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl border border-blue-100 gap-4">
-                  <div>
-                    <p className="text-2xl font-black text-blue-900 capitalize leading-none mb-2">
-                      {format(new Date(myBooking.data), 'EEEE d MMMM', { locale: it })}
-                    </p>
-                    <p className="text-blue-600 font-bold text-lg">{myBooking.inizio} - {myBooking.fine}</p>
-                  </div>
-                  <div className="bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-200">
-                    Confermata
+              <div className="mb-12 p-1 bg-gradient-to-br from-blue-500 to-blue-600 rounded-[2rem] shadow-xl shadow-blue-100">
+                <div className="bg-white/95 backdrop-blur-sm p-6 rounded-[1.8rem]">
+                  <h2 className="text-[10px] font-black text-blue-600 mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">
+                    <Clock className="w-3 h-3" />
+                    Prenotazione Attiva
+                  </h2>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <p className="text-2xl font-black text-gray-900 capitalize leading-tight">
+                        {format(new Date(myBooking.data), 'EEEE d MMMM', { locale: it })}
+                      </p>
+                      <p className="text-blue-600 font-black text-lg mt-1">{myBooking.inizio} — {myBooking.fine}</p>
+                    </div>
+                    <div className="bg-green-500 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-green-100 flex items-center gap-2">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Confermata
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2072,11 +2072,9 @@ const BookingView = ({ token }: { token: string }) => {
 
             {!message && (
               <>
-                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Plus className="w-6 h-6 text-blue-600" />
-                  </div>
+                <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-4">
                   Scegli un orario
+                  <div className="h-px bg-gray-100 flex-1"></div>
                 </h3>
                 
                 {loading ? (
@@ -2085,7 +2083,7 @@ const BookingView = ({ token }: { token: string }) => {
                     <p className="text-gray-500 font-bold animate-pulse">Caricamento orari...</p>
                   </div>
                 ) : (
-                  <div className="space-y-10">
+                  <div className="space-y-12">
                     {groupedSlots.length === 0 ? (
                       <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                         <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -2094,12 +2092,15 @@ const BookingView = ({ token }: { token: string }) => {
                       </div>
                     ) : (
                       groupedSlots.map(([date, daySlots]) => (
-                        <div key={date} className="space-y-4">
-                          <h4 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                            <span className="bg-gray-200 h-px flex-1"></span>
-                            <span className="bg-white px-2 capitalize">{format(new Date(date), 'EEEE d MMMM', { locale: it })}</span>
-                            <span className="bg-gray-200 h-px flex-1"></span>
-                          </h4>
+                        <div key={date} className="space-y-6">
+                          <div className="flex items-center gap-4">
+                            <div className="bg-blue-600 text-white px-4 py-1 rounded-lg text-xs font-black uppercase tracking-widest">
+                              {format(new Date(date), 'MMM', { locale: it })}
+                            </div>
+                            <h4 className="text-lg font-black text-gray-900 capitalize">
+                              {format(new Date(date), 'EEEE d', { locale: it })}
+                            </h4>
+                          </div>
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {daySlots.map((slot, idx) => {
