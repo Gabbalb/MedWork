@@ -21,7 +21,8 @@ import {
   Settings,
   Trash2,
   Pencil,
-  User
+  User,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
@@ -903,6 +904,8 @@ const CompanyDetail = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [originalDate, setOriginalDate] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [invitationSuccess, setInvitationSuccess] = useState<string | null>(null);
 
   const fetchDipendenti = () => {
     fetchGAS({ action: 'getDipendenti', aziendaId: id })
@@ -1172,6 +1175,26 @@ const CompanyDetail = () => {
     }
   };
 
+  const handleSendInvitations = async () => {
+    if (!window.confirm("Sei sicuro di voler inviare gli inviti a tutti i dipendenti di questa azienda?")) return;
+    setInviting(true);
+    setInvitationSuccess(null);
+    try {
+      const res = await fetchGAS({ action: 'sendInvitations', aziendaId: id });
+      if (res.success) {
+        setInvitationSuccess(`Inviti inviati con successo a ${res.sent} dipendenti!`);
+        setTimeout(() => setInvitationSuccess(null), 5000);
+      } else {
+        alert("Errore durante l'invio: " + res.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Errore di connessione");
+    } finally {
+      setInviting(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   if (!GAS_URL) return <div className="text-center py-20 text-amber-600 font-medium">Configurazione mancante: VITE_GAS_URL non impostata.</div>;
   if (!azienda) return <div className="text-center py-20">Azienda non trovata.</div>;
@@ -1262,6 +1285,26 @@ const CompanyDetail = () => {
           </div>
         </div>
         <div className="flex gap-3">
+          {invitationSuccess && (
+            <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 animate-pulse">
+              <CheckCircle2 className="w-4 h-4" />
+              {invitationSuccess}
+            </div>
+          )}
+          <button 
+            onClick={handleSendInvitations}
+            disabled={inviting}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all",
+              inviting 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+            )}
+            title="Invia inviti via email a tutti i dipendenti"
+          >
+            <Mail className="w-4 h-4" />
+            {inviting ? "Invio in corso..." : "Invia Inviti"}
+          </button>
           <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
             <Users className="w-4 h-4" />
             {dipendenti.length} Dipendenti

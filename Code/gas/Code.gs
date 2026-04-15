@@ -1,3 +1,8 @@
+// --- CONFIGURAZIONE ---
+const CALENDAR_ID = '5ec48c9ca8e7068ad36446bcc69d00f25f4a76cb08a32fff43f49da8f296dee2@group.calendar.google.com'; 
+const APP_URL = 'https://ais-dev-yv3m5yedal6d5ucpixu27p-742201877313.europe-west2.run.app';
+const DOCTOR_EMAIL = 'balbiani.gabriele@gmail.com';
+
 // --- GESTORE RICHIESTE ---
 function doGet(e) { return handleRequest(e); }
 function doPost(e) { return handleRequest(e); }
@@ -19,6 +24,7 @@ function handleRequest(e) {
     else if (action === 'addSlots') result = addSlots(JSON.parse(e.parameter.slots));
     else if (action === 'updateSlot') result = updateSlot(e.parameter);
     else if (action === 'deleteSlot') result = deleteSlot(e.parameter);
+    else if (action === 'sendInvitations') result = sendInvitations(e.parameter.aziendaId);
     else throw new Error("Azione '" + action + "' non riconosciuta.");
     
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -166,6 +172,69 @@ function getAllSlots() {
   });
 }
 
+// --- LOGICA EMAIL ---
+
+function sendInvitations(aziendaId) {
+  var dipendenti = getDipendenti(aziendaId);
+  var aziendaNome = getAziendaNome(aziendaId);
+  var count = 0;
+  
+  dipendenti.forEach(function(d) {
+    var email = d.Mail || d.mail || d.Email || d.email;
+    if (email) {
+      // Genera Token: AziendaID|DipendenteID|Nome|Email
+      var rawToken = aziendaId + "|" + d.ID + "|" + d.Nome + "|" + email;
+      var token = Utilities.base64Encode(rawToken);
+      var magicLink = APP_URL + "?token=" + token;
+      
+      var subject = "Prenotazione Visita Medica - " + aziendaNome;
+      var body = "Gentile " + d.Nome + ",\n\n" +
+                 "È necessario prenotare la visita medica periodica.\n" +
+                 "Puoi scegliere la data e l'orario che preferisci cliccando sul link seguente:\n\n" +
+                 magicLink + "\n\n" +
+                 "Cordiali saluti,\n" +
+                 "MedWork Manager";
+      
+      GmailApp.sendEmail(email, subject, body);
+      count++;
+    }
+  });
+  
+  return { success: true, sent: count };
+}
+
+function sendConfirmationEmail(params, aziendaNome) {
+  var dateStr = params.data;
+  var inizio = params.inizio;
+  var nome = params.dipendenteNome;
+  var mail = params.dipendenteEmail;
+  
+  // Mail al Dipendente
+  var rawToken = params.aziendaId + "|" + "" + "|" + nome + "|" + mail;
+  var token = Utilities.base64Encode(rawToken);
+  var magicLink = APP_URL + "?token=" + token;
+  
+  var subDip = "Conferma Prenotazione Visita Medica";
+  var bodyDip = "Gentile " + nome + ",\n\n" +
+                "La tua visita medica è stata confermata per il giorno " + dateStr + " alle ore " + inizio + ".\n\n" +
+                "Se desideri modificare la prenotazione, puoi farlo in qualsiasi momento cliccando qui:\n" +
+                magicLink + "\n\n" +
+                "Cordiali saluti.";
+  
+  GmailApp.sendEmail(mail, subDip, bodyDip);
+  
+  // Mail al Dottore
+  var subDoc = "Nuova Prenotazione: " + nome + " (" + aziendaNome + ")";
+  var bodyDoc = "Nuova prenotazione ricevuta:\n\n" +
+                "Lavoratore: " + nome + "\n" +
+                "Azienda: " + aziendaNome + "\n" +
+                "Data: " + dateStr + "\n" +
+                "Ora: " + inizio + "\n" +
+                "Email: " + mail;
+  
+  GmailApp.sendEmail(DOCTOR_EMAIL, subDoc, bodyDoc);
+}
+
 // --- CONFIGURAZIONE CALENDARIO ---
 const CALENDAR_ID = '5ec48c9ca8e7068ad36446bcc69d00f25f4a76cb08a32fff43f49da8f296dee2@group.calendar.google.com'; 
 
@@ -187,6 +256,7 @@ function updateSlot(params) {
       String(data[i][1]).split('T')[0];
     
     if (String(data[i][0]) === aziendaId && rowDate === dateStr && String(data[i][2]) === inizio) {
+      var vecchioStato = data[i][5];
       sheet.getRange(i + 1, 6).setValue(nuovoStato); // Stato
       sheet.getRange(i + 1, 7).setValue(mail);       // Mail
       sheet.getRange(i + 1, 8).setValue(nome);       // Nome
@@ -198,6 +268,11 @@ function updateSlot(params) {
       if (nuovoStato === 'Occupato') {
         var newId = syncToCalendar(eventId, nome, aziendaNome, dateStr, inizio, fine, mail);
         sheet.getRange(i + 1, 9).setValue(newId);
+        
+        // Se è una nuova prenotazione (non un aggiornamento tecnico), manda mail
+        if (vecchioStato !== 'Occupato' && mail) {
+          sendConfirmationEmail(params, aziendaNome);
+        }
       } else if (nuovoStato === 'Libero' && eventId) {
         removeFromCalendar(eventId);
         sheet.getRange(i + 1, 9).setValue('');
