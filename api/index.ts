@@ -404,12 +404,18 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // On Vercel, we don't call listen, Vercel handles the app export
+  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 
   return app;
 }
 
-const appPromise = startServer();
-export default appPromise;
+// For Vercel, we export a handler that awaits the app initialization
+export default async (req: any, res: any) => {
+  const app = await startServer();
+  return app(req, res);
+};
