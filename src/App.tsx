@@ -1939,11 +1939,25 @@ const BookingView = ({ token }: { token: string }) => {
   const companySlots = allSlots.filter(s => s.aziendaId === info.aziendaId);
   const myBooking = companySlots.find(s => s.dipendenteEmail === info.dipendenteEmail);
 
+  // Raggruppa gli slot per giorno
+  const groupedSlots = React.useMemo(() => {
+    const groups: { [key: string]: any[] } = {};
+    companySlots
+      .filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio))
+      .sort((a, b) => new Date(a.data + 'T' + a.inizio).getTime() - new Date(b.data + 'T' + b.inizio).getTime())
+      .forEach(slot => {
+        const dateKey = slot.data;
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(slot);
+      });
+    return Object.entries(groups).sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+  }, [companySlots, myBooking]);
+
   const handleBook = async (slot: any) => {
     if (bookingLoading) return;
     setBookingLoading(true);
     setMessage(null);
-    setConfirmingSlot(null);
+    // Non chiudiamo il modale di conferma qui, lo lasciamo aperto per mostrare il caricamento
     try {
       // 1. Occupiamo il nuovo slot
       const res = await fetchGAS({
@@ -1969,12 +1983,15 @@ const BookingView = ({ token }: { token: string }) => {
             dipendenteNome: ''
           });
         }
+        setConfirmingSlot(null); // Chiudiamo il modale solo al successo
         setMessage({ type: 'success', text: 'Prenotazione confermata con successo! Riceverai una mail di conferma a breve.' });
         fetchSlots();
       } else {
+        setConfirmingSlot(null);
         setMessage({ type: 'error', text: 'Errore: ' + (res.error || 'Riprova più tardi.') });
       }
     } catch (err) {
+      setConfirmingSlot(null);
       setMessage({ type: 'error', text: 'Errore di connessione. Controlla la tua rete e riprova.' });
     } finally {
       setBookingLoading(false);
@@ -1994,119 +2011,142 @@ const BookingView = ({ token }: { token: string }) => {
           </div>
 
           <div className="p-6">
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {message && (
                 <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  key="success-message"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   className={cn(
-                    "p-6 rounded-2xl flex flex-col items-center text-center gap-3 mb-8",
-                    message.type === 'success' ? "bg-green-50 text-green-800 border-2 border-green-200" : "bg-red-50 text-red-800 border-2 border-red-200"
+                    "p-8 rounded-3xl flex flex-col items-center text-center gap-4 mb-8 shadow-xl",
+                    message.type === 'success' ? "bg-green-50 text-green-900 border-2 border-green-200" : "bg-red-50 text-red-900 border-2 border-red-200"
                   )}
                 >
                   {message.type === 'success' ? (
-                    <div className="bg-green-500 p-3 rounded-full text-white mb-2">
-                      <CheckCircle2 className="w-8 h-8" />
+                    <div className="bg-green-500 p-4 rounded-full text-white mb-2 shadow-lg shadow-green-200">
+                      <CheckCircle2 className="w-12 h-12" />
                     </div>
                   ) : (
-                    <div className="bg-red-500 p-3 rounded-full text-white mb-2">
-                      <AlertCircle className="w-8 h-8" />
+                    <div className="bg-red-500 p-4 rounded-full text-white mb-2 shadow-lg shadow-red-200">
+                      <AlertCircle className="w-12 h-12" />
                     </div>
                   )}
-                  <p className="text-lg font-bold">{message.text}</p>
+                  <h2 className="text-2xl font-black">{message.type === 'success' ? 'Fatto!' : 'Ops!'}</h2>
+                  <p className="text-lg font-bold leading-tight">{message.text}</p>
                   {message.type === 'success' && (
-                    <p className="text-sm text-green-700">Puoi chiudere questa pagina o salvare l'appuntamento.</p>
+                    <p className="text-sm text-green-700 font-medium">Puoi chiudere questa pagina in sicurezza.</p>
                   )}
+                  <button 
+                    onClick={() => setMessage(null)}
+                    className="mt-4 px-6 py-2 bg-white border-2 border-current rounded-full text-sm font-bold hover:bg-white/50 transition-colors"
+                  >
+                    Torna alla lista
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {myBooking && !message && (
-              <div className="mb-8 p-5 bg-blue-50 rounded-2xl border-2 border-blue-200 shadow-sm">
-                <h2 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2 uppercase tracking-wider">
+              <div className="mb-10 p-6 bg-blue-50 rounded-3xl border-2 border-blue-200 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-3 opacity-10">
+                  <CalendarIcon className="w-20 h-20" />
+                </div>
+                <h2 className="text-xs font-black text-blue-900 mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">
                   <Clock className="w-4 h-4" />
                   La tua prenotazione attuale:
                 </h2>
-                <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-blue-100">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl border border-blue-100 gap-4">
                   <div>
-                    <p className="text-xl font-black text-blue-900 capitalize">
+                    <p className="text-2xl font-black text-blue-900 capitalize leading-none mb-2">
                       {format(new Date(myBooking.data), 'EEEE d MMMM', { locale: it })}
                     </p>
-                    <p className="text-blue-700 font-medium">{myBooking.inizio} - {myBooking.fine}</p>
+                    <p className="text-blue-600 font-bold text-lg">{myBooking.inizio} - {myBooking.fine}</p>
                   </div>
-                  <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest">
+                  <div className="bg-blue-600 text-white px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-200">
                     Confermata
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-blue-600 font-medium italic">
-                  * Seleziona un altro slot qui sotto se desideri cambiare orario.
-                </p>
               </div>
             )}
 
             {!message && (
               <>
-                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-blue-600" />
-                  Scegli un nuovo orario
+                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Plus className="w-6 h-6 text-blue-600" />
+                  </div>
+                  Scegli un orario
                 </h3>
                 
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-b-blue-600"></div>
-                    <p className="text-gray-500 font-medium animate-pulse">Caricamento disponibilità...</p>
+                    <div className="animate-spin rounded-full h-14 w-14 border-4 border-blue-100 border-b-blue-600"></div>
+                    <p className="text-gray-500 font-bold animate-pulse">Caricamento orari...</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {companySlots.filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio)).length === 0 ? (
-                      <div className="col-span-full text-center py-12 bg-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
-                        <CalendarIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500 font-bold">Nessuno slot disponibile al momento.</p>
-                        <p className="text-sm text-gray-400">Contatta il responsabile per maggiori informazioni.</p>
+                  <div className="space-y-10">
+                    {groupedSlots.length === 0 ? (
+                      <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                        <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-500 font-black text-lg">Nessun orario disponibile</p>
+                        <p className="text-sm text-gray-400 max-w-xs mx-auto mt-2">Al momento non ci sono slot liberi per l'azienda selezionata.</p>
                       </div>
                     ) : (
-                      companySlots
-                        .filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio))
-                        .sort((a, b) => new Date(a.data + 'T' + a.inizio).getTime() - new Date(b.data + 'T' + b.inizio).getTime())
-                        .map((slot, idx) => {
-                          const isCurrent = myBooking && slot.data === myBooking.data && slot.inizio === myBooking.inizio;
-                          return (
-                            <button
-                              key={idx}
-                              disabled={isCurrent || bookingLoading}
-                              onClick={() => setConfirmingSlot(slot)}
-                              className={cn(
-                                "relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group",
-                                isCurrent 
-                                  ? "bg-blue-50 border-blue-300 cursor-default" 
-                                  : "bg-white border-gray-100 hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]"
-                              )}
-                            >
-                              <div className={cn(
-                                "w-16 h-16 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm transition-colors",
-                                isCurrent ? "bg-blue-600 text-white" : "bg-gray-50 text-gray-600 group-hover:bg-blue-50"
-                              )}>
-                                <span className="text-lg font-black leading-none">{slot.inizio}</span>
-                                <span className="text-[10px] font-bold uppercase mt-1 opacity-70">{format(new Date(slot.data), 'd MMM', { locale: it })}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-black text-gray-900 capitalize truncate">{format(new Date(slot.data), 'EEEE', { locale: it })}</p>
-                                <p className="text-sm text-gray-500 font-medium">{format(new Date(slot.data), 'd MMMM yyyy', { locale: it })}</p>
-                              </div>
-                              {!isCurrent && (
-                                <div className="bg-blue-50 p-2 rounded-full text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <ChevronRight className="w-5 h-5" />
-                                </div>
-                              )}
-                              {isCurrent && (
-                                <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1 rounded-full shadow-lg">
-                                  <CheckCircle2 className="w-4 h-4" />
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })
+                      groupedSlots.map(([date, daySlots]) => (
+                        <div key={date} className="space-y-4">
+                          <h4 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                            <span className="bg-gray-200 h-px flex-1"></span>
+                            <span className="bg-white px-2 capitalize">{format(new Date(date), 'EEEE d MMMM', { locale: it })}</span>
+                            <span className="bg-gray-200 h-px flex-1"></span>
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {daySlots.map((slot, idx) => {
+                              const isCurrent = myBooking && slot.data === myBooking.data && slot.inizio === myBooking.inizio;
+                              return (
+                                <button
+                                  key={idx}
+                                  disabled={isCurrent || bookingLoading}
+                                  onClick={() => setConfirmingSlot(slot)}
+                                  className={cn(
+                                    "relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group",
+                                    isCurrent 
+                                      ? "bg-blue-50 border-blue-400 cursor-default" 
+                                      : "bg-white border-gray-100 hover:border-blue-600 hover:shadow-xl active:scale-[0.98]"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm transition-colors",
+                                    isCurrent ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 group-hover:bg-blue-600 group-hover:text-white"
+                                  )}>
+                                    <span className="text-sm font-black leading-none">{format(new Date(slot.data), 'd')}</span>
+                                    <span className="text-[9px] font-bold uppercase mt-1 opacity-70">{format(new Date(slot.data), 'MMM', { locale: it })}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-black text-xl text-gray-900 leading-none mb-1 group-hover:text-blue-600 transition-colors">
+                                      {slot.inizio}
+                                    </p>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                                      Fino alle {slot.fine}
+                                    </p>
+                                  </div>
+                                  {!isCurrent && (
+                                    <div className="bg-blue-50 p-2 rounded-full text-blue-600 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
+                                      <ChevronRight className="w-5 h-5" />
+                                    </div>
+                                  )}
+                                  {isCurrent && (
+                                    <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1.5 rounded-full shadow-lg border-2 border-white">
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 )}
@@ -2114,8 +2154,8 @@ const BookingView = ({ token }: { token: string }) => {
             )}
           </div>
         </div>
-        <p className="text-center text-xs text-gray-400 font-medium">
-          MedWork Manager &copy; 2024 - Sistema di gestione visite mediche
+        <p className="text-center text-xs text-gray-400 font-bold uppercase tracking-widest">
+          MedWork Manager &copy; 2024
         </p>
       </div>
 
@@ -2128,49 +2168,56 @@ const BookingView = ({ token }: { token: string }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => !bookingLoading && setConfirmingSlot(null)}
-              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-gray-900/80 backdrop-blur-md"
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden"
             >
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CalendarIcon className="w-10 h-10" />
+              {bookingLoading && (
+                <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
+                  <div className="relative w-24 h-24 mb-6">
+                    <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                    <CalendarIcon className="absolute inset-0 m-auto w-10 h-10 text-blue-600 animate-pulse" />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">Conferma in corso</h3>
+                  <p className="text-gray-500 font-medium">Stiamo registrando la tua visita, non chiudere questa pagina...</p>
                 </div>
-                <h2 className="text-2xl font-black text-gray-900 mb-2">Confermi la prenotazione?</h2>
-                <p className="text-gray-500 mb-8">Stai prenotando la tua visita medica per il seguente orario:</p>
+              )}
+
+              <div className="p-10 text-center">
+                <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-8 rotate-3 shadow-inner">
+                  <CalendarIcon className="w-12 h-12" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-900 mb-3">Confermi?</h2>
+                <p className="text-gray-500 font-medium mb-8 leading-relaxed">
+                  Hai scelto di prenotare la visita per il seguente orario:
+                </p>
                 
-                <div className="bg-gray-50 p-6 rounded-2xl border-2 border-gray-100 mb-8">
-                  <p className="text-2xl font-black text-blue-600 mb-1">{confirmingSlot.inizio}</p>
-                  <p className="text-lg font-bold text-gray-800 capitalize">
+                <div className="bg-gray-50 p-8 rounded-[2rem] border-2 border-gray-100 mb-10 shadow-inner">
+                  <p className="text-4xl font-black text-blue-600 mb-2">{confirmingSlot.inizio}</p>
+                  <p className="text-lg font-black text-gray-800 capitalize">
                     {format(new Date(confirmingSlot.data), 'EEEE d MMMM', { locale: it })}
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
                   <button
                     onClick={() => handleBook(confirmingSlot)}
                     disabled={bookingLoading}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                    className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all"
                   >
-                    {bookingLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-6 w-6 border-3 border-white/30 border-b-white"></div>
-                        Conferma in corso...
-                      </>
-                    ) : (
-                      "Sì, prenota ora"
-                    )}
+                    Sì, conferma ora
                   </button>
                   <button
                     onClick={() => setConfirmingSlot(null)}
                     disabled={bookingLoading}
-                    className="w-full py-4 text-gray-500 font-bold hover:text-gray-700 transition-colors"
+                    className="w-full py-2 text-gray-400 font-black uppercase tracking-widest text-xs hover:text-gray-600 transition-colors"
                   >
-                    Annulla
+                    Annulla e torna indietro
                   </button>
                 </div>
               </div>
