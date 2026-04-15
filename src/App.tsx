@@ -135,6 +135,94 @@ const normalizeDipendente = (d: any): Dipendente => {
 };
 
 // Components
+const Login = ({ onLogin }: { onLogin: () => void }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (response.ok) {
+        localStorage.setItem('medwork_auth', 'true');
+        onLogin();
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Credenziali non valide. Riprova.');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Errore di connessione al server.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-blue-100 w-full max-w-md border border-gray-100"
+      >
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
+            <Building2 className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-black text-gray-900">Area Riservata</h1>
+          <p className="text-gray-500 font-medium mt-2">Accedi per gestire le aziende</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold flex items-center gap-2 border border-red-100">
+              <AlertCircle className="w-5 h-5" />
+              {error}
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <label className="text-sm font-black text-gray-700 ml-1">Email</label>
+            <input 
+              type="email" 
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl border-2 border-gray-100 focus:border-blue-500 outline-none transition-all font-medium"
+              placeholder="tua@email.it"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-black text-gray-700 ml-1">Password</label>
+            <input 
+              type="password" 
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl border-2 border-gray-100 focus:border-blue-500 outline-none transition-all font-medium"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button 
+            type="submit"
+            className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all"
+          >
+            Accedi ora
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
 const Navbar = () => (
   <nav className="border-b border-gray-200 bg-white sticky top-0 z-50">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,6 +235,15 @@ const Navbar = () => (
         </Link>
         <div className="flex items-center gap-4">
           <Link to="/" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">Dashboard</Link>
+          <button 
+            onClick={() => {
+              localStorage.removeItem('medwork_auth');
+              window.location.reload();
+            }}
+            className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors"
+          >
+            Esci
+          </button>
         </div>
       </div>
     </div>
@@ -2293,6 +2390,11 @@ function AppContent() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const isBookingMode = !!token;
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('medwork_auth'));
+
+  if (!isBookingMode && !isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">

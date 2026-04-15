@@ -92,6 +92,18 @@ async function startServer() {
   };
 
   // API Routes
+  app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPass = process.env.ADMIN_PASSWORD;
+
+    if (email && password && email === adminEmail && password === adminPass) {
+      res.json({ success: true });
+    } else {
+      res.status(401).json({ success: false, message: 'Credenziali non valide' });
+    }
+  });
+
   app.get('/api/aziende', async (req, res) => {
     await cleanupOldSlots();
     const data = await getSheetData('Aziende!A2:D');
