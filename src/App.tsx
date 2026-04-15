@@ -741,6 +741,21 @@ const Dashboard = () => {
                     </div>
                   )}
 
+                  {selectedSlot.stato === 'Occupato' && !isEditingEmployee && (
+                    <button 
+                      onClick={() => handleUpdateSlotStatus('Libero')}
+                      disabled={isSlotActionLoading}
+                      className="w-full py-3 bg-green-50 text-green-600 rounded-2xl font-bold hover:bg-green-100 transition-all flex items-center justify-center gap-2 mb-2"
+                    >
+                      {isSlotActionLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div> : (
+                        <>
+                          <CheckCircle2 className="w-5 h-5" />
+                          Rendi Libero
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <div className="flex gap-3 mt-4">
                     <button 
                       onClick={handleDeleteSlot}
@@ -2037,12 +2052,14 @@ const BookingView = ({ token }: { token: string }) => {
                   {message.type === 'success' && (
                     <p className="text-sm text-green-700 font-medium">Puoi chiudere questa pagina in sicurezza.</p>
                   )}
-                  <button 
-                    onClick={() => setMessage(null)}
-                    className="mt-4 px-6 py-2 bg-white border-2 border-current rounded-full text-sm font-bold hover:bg-white/50 transition-colors"
-                  >
-                    Torna alla lista
-                  </button>
+                  {message.type === 'error' && (
+                    <button 
+                      onClick={() => setMessage(null)}
+                      className="mt-4 px-6 py-2 bg-white border-2 border-current rounded-full text-sm font-bold hover:bg-white/50 transition-colors"
+                    >
+                      Torna alla lista
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
