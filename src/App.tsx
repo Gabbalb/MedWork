@@ -1148,7 +1148,7 @@ const CompanyDetail = () => {
       const data = await fetchGAS({ action: 'deleteDipendente' }, {
         action: 'deleteDipendente',
         aziendaId: id,
-        dipendenteId
+        id: dipendenteId
       });
       if (data.success) {
         fetchDipendenti();
@@ -1630,7 +1630,7 @@ const CompanyDetail = () => {
                 ))}
                 {dipendenti.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-6 py-10 text-center text-gray-400 italic">
+                    <td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">
                       Nessun dipendente trovato per questa azienda.
                     </td>
                   </tr>
