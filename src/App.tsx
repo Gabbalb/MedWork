@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import FullCalendar from '@fullcalendar/react';
@@ -1904,6 +1905,7 @@ const BookingView = ({ token }: { token: string }) => {
   const [allSlots, setAllSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [confirmingSlot, setConfirmingSlot] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const fetchSlots = async () => {
@@ -1941,7 +1943,9 @@ const BookingView = ({ token }: { token: string }) => {
     if (bookingLoading) return;
     setBookingLoading(true);
     setMessage(null);
+    setConfirmingSlot(null);
     try {
+      // 1. Occupiamo il nuovo slot
       const res = await fetchGAS({
         action: 'updateSlot',
         aziendaId: info.aziendaId,
@@ -1953,6 +1957,7 @@ const BookingView = ({ token }: { token: string }) => {
       });
 
       if (res.success) {
+        // 2. Se avevamo un vecchio slot diverso, lo liberiamo
         if (myBooking && (myBooking.data !== slot.data || myBooking.inizio !== slot.inizio)) {
           await fetchGAS({
             action: 'updateSlot',
@@ -1964,13 +1969,13 @@ const BookingView = ({ token }: { token: string }) => {
             dipendenteNome: ''
           });
         }
-        setMessage({ type: 'success', text: 'Prenotazione confermata! Riceverai una mail di conferma.' });
+        setMessage({ type: 'success', text: 'Prenotazione confermata con successo! Riceverai una mail di conferma a breve.' });
         fetchSlots();
       } else {
         setMessage({ type: 'error', text: 'Errore: ' + (res.error || 'Riprova più tardi.') });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Errore di connessione. Riprova.' });
+      setMessage({ type: 'error', text: 'Errore di connessione. Controlla la tua rete e riprova.' });
     } finally {
       setBookingLoading(false);
     }
@@ -1985,103 +1990,194 @@ const BookingView = ({ token }: { token: string }) => {
               <CalendarIcon className="w-6 h-6" />
               <h1 className="text-xl font-bold">Prenotazione Visita Medica</h1>
             </div>
-            <p className="text-blue-100">Ciao <strong>{info.dipendenteNome}</strong>, seleziona uno slot per la tua visita presso <strong>{info.aziendaId}</strong>.</p>
+            <p className="text-blue-100">Ciao <strong>{info.dipendenteNome}</strong>, seleziona l'orario che preferisci per la tua visita medica.</p>
           </div>
 
           <div className="p-6">
-            {message && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={clsx(
-                  "p-4 rounded-xl flex items-center gap-3 mb-6",
-                  message.type === 'success' ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"
-                )}
-              >
-                {message.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                <p className="text-sm font-medium">{message.text}</p>
-              </motion.div>
-            )}
+            <AnimatePresence>
+              {message && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className={cn(
+                    "p-6 rounded-2xl flex flex-col items-center text-center gap-3 mb-8",
+                    message.type === 'success' ? "bg-green-50 text-green-800 border-2 border-green-200" : "bg-red-50 text-red-800 border-2 border-red-200"
+                  )}
+                >
+                  {message.type === 'success' ? (
+                    <div className="bg-green-500 p-3 rounded-full text-white mb-2">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+                  ) : (
+                    <div className="bg-red-500 p-3 rounded-full text-white mb-2">
+                      <AlertCircle className="w-8 h-8" />
+                    </div>
+                  )}
+                  <p className="text-lg font-bold">{message.text}</p>
+                  {message.type === 'success' && (
+                    <p className="text-sm text-green-700">Puoi chiudere questa pagina o salvare l'appuntamento.</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {myBooking && (
-              <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                <h2 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+            {myBooking && !message && (
+              <div className="mb-8 p-5 bg-blue-50 rounded-2xl border-2 border-blue-200 shadow-sm">
+                <h2 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2 uppercase tracking-wider">
                   <Clock className="w-4 h-4" />
                   La tua prenotazione attuale:
                 </h2>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-blue-100">
                   <div>
-                    <p className="text-lg font-bold text-blue-900">
-                      {format(new Date(myBooking.data), 'EEEE d MMMM')}
+                    <p className="text-xl font-black text-blue-900 capitalize">
+                      {format(new Date(myBooking.data), 'EEEE d MMMM', { locale: it })}
                     </p>
-                    <p className="text-blue-700">{myBooking.inizio} - {myBooking.fine}</p>
+                    <p className="text-blue-700 font-medium">{myBooking.inizio} - {myBooking.fine}</p>
                   </div>
-                  <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest">
                     Confermata
                   </div>
                 </div>
+                <p className="mt-3 text-xs text-blue-600 font-medium italic">
+                  * Seleziona un altro slot qui sotto se desideri cambiare orario.
+                </p>
               </div>
             )}
 
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Slot disponibili</h3>
-            
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {companySlots.filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio)).length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">Nessuno slot disponibile al momento.</p>
+            {!message && (
+              <>
+                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-blue-600" />
+                  Scegli un nuovo orario
+                </h3>
+                
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-b-blue-600"></div>
+                    <p className="text-gray-500 font-medium animate-pulse">Caricamento disponibilità...</p>
+                  </div>
                 ) : (
-                  companySlots
-                    .filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio))
-                    .sort((a, b) => new Date(a.data + 'T' + a.inizio).getTime() - new Date(b.data + 'T' + b.inizio).getTime())
-                    .map((slot, idx) => {
-                      const isCurrent = myBooking && slot.data === myBooking.data && slot.inizio === myBooking.inizio;
-                      return (
-                        <button
-                          key={idx}
-                          disabled={isCurrent || bookingLoading}
-                          onClick={() => handleBook(slot)}
-                          className={clsx(
-                            "w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left",
-                            isCurrent 
-                              ? "bg-blue-50 border-blue-200 cursor-default" 
-                              : "bg-white border-gray-200 hover:border-blue-400 hover:shadow-md active:scale-[0.98]"
-                          )}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={clsx(
-                              "w-12 h-12 rounded-lg flex flex-col items-center justify-center",
-                              isCurrent ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
-                            )}>
-                              <span className="text-[10px] font-bold uppercase leading-none">{format(new Date(slot.data), 'MMM')}</span>
-                              <span className="text-lg font-bold leading-none">{format(new Date(slot.data), 'd')}</span>
-                            </div>
-                            <div>
-                              <p className="font-bold text-gray-900">{format(new Date(slot.data), 'EEEE')}</p>
-                              <p className="text-sm text-gray-500">{slot.inizio} - {slot.fine}</p>
-                            </div>
-                          </div>
-                          {!isCurrent && (
-                            <div className="text-blue-600 font-bold text-sm flex items-center gap-1">
-                              {bookingLoading ? '...' : 'Prenota'}
-                              <ChevronRight className="w-4 h-4" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {companySlots.filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio)).length === 0 ? (
+                      <div className="col-span-full text-center py-12 bg-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
+                        <CalendarIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-500 font-bold">Nessuno slot disponibile al momento.</p>
+                        <p className="text-sm text-gray-400">Contatta il responsabile per maggiori informazioni.</p>
+                      </div>
+                    ) : (
+                      companySlots
+                        .filter(s => s.stato === 'Libero' || (myBooking && s.data === myBooking.data && s.inizio === myBooking.inizio))
+                        .sort((a, b) => new Date(a.data + 'T' + a.inizio).getTime() - new Date(b.data + 'T' + b.inizio).getTime())
+                        .map((slot, idx) => {
+                          const isCurrent = myBooking && slot.data === myBooking.data && slot.inizio === myBooking.inizio;
+                          return (
+                            <button
+                              key={idx}
+                              disabled={isCurrent || bookingLoading}
+                              onClick={() => setConfirmingSlot(slot)}
+                              className={cn(
+                                "relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group",
+                                isCurrent 
+                                  ? "bg-blue-50 border-blue-300 cursor-default" 
+                                  : "bg-white border-gray-100 hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-16 h-16 rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm transition-colors",
+                                isCurrent ? "bg-blue-600 text-white" : "bg-gray-50 text-gray-600 group-hover:bg-blue-50"
+                              )}>
+                                <span className="text-lg font-black leading-none">{slot.inizio}</span>
+                                <span className="text-[10px] font-bold uppercase mt-1 opacity-70">{format(new Date(slot.data), 'd MMM', { locale: it })}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-black text-gray-900 capitalize truncate">{format(new Date(slot.data), 'EEEE', { locale: it })}</p>
+                                <p className="text-sm text-gray-500 font-medium">{format(new Date(slot.data), 'd MMMM yyyy', { locale: it })}</p>
+                              </div>
+                              {!isCurrent && (
+                                <div className="bg-blue-50 p-2 rounded-full text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <ChevronRight className="w-5 h-5" />
+                                </div>
+                              )}
+                              {isCurrent && (
+                                <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1 rounded-full shadow-lg">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-gray-400 font-medium">
           MedWork Manager &copy; 2024 - Sistema di gestione visite mediche
         </p>
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmingSlot && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !bookingLoading && setConfirmingSlot(null)}
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <CalendarIcon className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 mb-2">Confermi la prenotazione?</h2>
+                <p className="text-gray-500 mb-8">Stai prenotando la tua visita medica per il seguente orario:</p>
+                
+                <div className="bg-gray-50 p-6 rounded-2xl border-2 border-gray-100 mb-8">
+                  <p className="text-2xl font-black text-blue-600 mb-1">{confirmingSlot.inizio}</p>
+                  <p className="text-lg font-bold text-gray-800 capitalize">
+                    {format(new Date(confirmingSlot.data), 'EEEE d MMMM', { locale: it })}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => handleBook(confirmingSlot)}
+                    disabled={bookingLoading}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                  >
+                    {bookingLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-6 w-6 border-3 border-white/30 border-b-white"></div>
+                        Conferma in corso...
+                      </>
+                    ) : (
+                      "Sì, prenota ora"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingSlot(null)}
+                    disabled={bookingLoading}
+                    className="w-full py-4 text-gray-500 font-bold hover:text-gray-700 transition-colors"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

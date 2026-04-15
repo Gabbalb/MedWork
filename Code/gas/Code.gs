@@ -1,6 +1,6 @@
 // --- CONFIGURAZIONE ---
 const CALENDAR_ID = '5ec48c9ca8e7068ad36446bcc69d00f25f4a76cb08a32fff43f49da8f296dee2@group.calendar.google.com'; 
-const APP_URL = 'https://ais-dev-yv3m5yedal6d5ucpixu27p-742201877313.europe-west2.run.app';
+const APP_URL = 'https://med-work.vercel.app';
 const DOCTOR_EMAIL = 'balbiani.gabriele@gmail.com';
 
 // --- GESTORE RICHIESTE ---
@@ -108,7 +108,7 @@ function getDipendenti(aziendaId) {
   if (!sheet) return [];
   var rows = sheet.getDataRange().getValues();
   var headers = rows.shift();
-  return rows.map(function(row) {
+  return rows.filter(function(row) { return row[0] !== ""; }).map(function(row) {
     var obj = {}; headers.forEach(function(h, i) { obj[h] = row[i]; });
     return obj;
   });
@@ -178,29 +178,48 @@ function sendInvitations(aziendaId) {
   var dipendenti = getDipendenti(aziendaId);
   var aziendaNome = getAziendaNome(aziendaId);
   var count = 0;
+  var errors = [];
   
   dipendenti.forEach(function(d) {
-    var email = d.Mail || d.mail || d.Email || d.email;
-    if (email) {
-      // Genera Token: AziendaID|DipendenteID|Nome|Email
-      var rawToken = aziendaId + "|" + d.ID + "|" + d.Nome + "|" + email;
-      var token = Utilities.base64Encode(rawToken);
-      var magicLink = APP_URL + "?token=" + token;
-      
-      var subject = "Prenotazione Visita Medica - " + aziendaNome;
-      var body = "Gentile " + d.Nome + ",\n\n" +
-                 "È necessario prenotare la visita medica periodica.\n" +
-                 "Puoi scegliere la data e l'orario che preferisci cliccando sul link seguente:\n\n" +
-                 magicLink + "\n\n" +
-                 "Cordiali saluti,\n" +
-                 "MedWork Manager";
-      
-      GmailApp.sendEmail(email, subject, body);
-      count++;
+    var email = (d.Mail || d.mail || d.Email || d.email || "").toString().trim();
+    var nome = (d.Nome || d.nome || "Dipendente").toString().trim();
+    
+    if (email && email.indexOf('@') !== -1) {
+      try {
+        // Genera Token: AziendaID|DipendenteID|Nome|Email
+        var rawToken = aziendaId + "|" + d.ID + "|" + nome + "|" + email;
+        var token = Utilities.base64Encode(rawToken, Utilities.Charset.UTF_8);
+        var magicLink = APP_URL + "?token=" + token;
+        
+        var subject = "Prenotazione Visita Medica - " + aziendaNome;
+        
+        var htmlBody = 
+          '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">' +
+            '<h2 style="color: #1d4ed8;">Prenotazione Visita Medica</h2>' +
+            '<p>Gentile <strong>' + nome + '</strong>,</p>' +
+            '<p>È necessario prenotare la visita medica periodica obbligatoria per l\'azienda <strong>' + aziendaNome + '</strong>.</p>' +
+            '<p>Puoi scegliere la data e l\'orario che preferisci cliccando sul pulsante qui sotto:</p>' +
+            '<div style="text-align: center; margin: 30px 0;">' +
+              '<a href="' + magicLink + '" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Scegli Orario Visita</a>' +
+            '</div>' +
+            '<p style="font-size: 12px; color: #6b7280;">Se il pulsante non funziona, copia e incolla questo link nel browser:<br>' + magicLink + '</p>' +
+            '<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">' +
+            '<p style="font-size: 14px; color: #374151;">Cordiali saluti,<br><strong>Lara Balbiani - Medico del Lavoro</strong></p>' +
+          '</div>';
+        
+        GmailApp.sendEmail(email, subject, "", { htmlBody: htmlBody });
+        count++;
+      } catch (e) {
+        errors.push("Errore invio a " + email + ": " + e.toString());
+      }
     }
   });
   
-  return { success: true, sent: count };
+  return { 
+    success: true, 
+    sent: count, 
+    errors: errors.length > 0 ? errors : null 
+  };
 }
 
 function sendConfirmationEmail(params, aziendaNome) {
@@ -211,17 +230,28 @@ function sendConfirmationEmail(params, aziendaNome) {
   
   // Mail al Dipendente
   var rawToken = params.aziendaId + "|" + "" + "|" + nome + "|" + mail;
-  var token = Utilities.base64Encode(rawToken);
+  var token = Utilities.base64Encode(rawToken, Utilities.Charset.UTF_8);
   var magicLink = APP_URL + "?token=" + token;
   
   var subDip = "Conferma Prenotazione Visita Medica";
-  var bodyDip = "Gentile " + nome + ",\n\n" +
-                "La tua visita medica è stata confermata per il giorno " + dateStr + " alle ore " + inizio + ".\n\n" +
-                "Se desideri modificare la prenotazione, puoi farlo in qualsiasi momento cliccando qui:\n" +
-                magicLink + "\n\n" +
-                "Cordiali saluti.";
+  var htmlDip = 
+    '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">' +
+      '<h2 style="color: #059669;">Prenotazione Confermata</h2>' +
+      '<p>Gentile <strong>' + nome + '</strong>,</p>' +
+      '<p>La tua visita medica è stata confermata con successo.</p>' +
+      '<div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">' +
+        '<p style="margin: 0; color: #166534;"><strong>Data:</strong> ' + dateStr + '</p>' +
+        '<p style="margin: 5px 0 0 0; color: #166534;"><strong>Orario:</strong> ' + inizio + '</p>' +
+      '</div>' +
+      '<p>Se desideri <strong>modificare</strong> la prenotazione, puoi farlo cliccando qui sotto:</p>' +
+      '<div style="text-align: center; margin: 20px 0;">' +
+        '<a href="' + magicLink + '" style="background-color: #4b5563; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Modifica Prenotazione</a>' +
+      '</div>' +
+      '<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">' +
+      '<p style="font-size: 14px; color: #374151;">Cordiali saluti,<br><strong>Lara Balbiani - Medico del Lavoro</strong></p>' +
+    '</div>';
   
-  GmailApp.sendEmail(mail, subDip, bodyDip);
+  GmailApp.sendEmail(mail, subDip, "", { htmlBody: htmlDip });
   
   // Mail al Dottore
   var subDoc = "Nuova Prenotazione: " + nome + " (" + aziendaNome + ")";
@@ -236,7 +266,6 @@ function sendConfirmationEmail(params, aziendaNome) {
 }
 
 // --- CONFIGURAZIONE CALENDARIO ---
-const CALENDAR_ID = '5ec48c9ca8e7068ad36446bcc69d00f25f4a76cb08a32fff43f49da8f296dee2@group.calendar.google.com'; 
 
 function updateSlot(params) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
