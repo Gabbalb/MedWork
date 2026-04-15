@@ -67,32 +67,36 @@ interface Dipendente {
 }
 
 const normalizeSlot = (s: any): Slot => {
-  if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '', dipendenteEmail: '' };
-  const getVal = (obj: any, key: string) => {
-    const target = key.toLowerCase().trim();
-    const actualKey = Object.keys(obj).find(k => k.toLowerCase().trim() === target);
-    return actualKey ? obj[actualKey] : undefined;
-  };
+  if (!s) return { aziendaId: '', data: '', inizio: '', fine: '', durata: '', stato: '', dipendenteEmail: '', dipendenteNome: '' };
   
-  let rawData = String(getVal(s, 'Data') || getVal(s, 'data') || '');
+  const get = (keys: string[]) => {
+    for (const k of keys) {
+      if (s[k] !== undefined && s[k] !== null) return s[k];
+      const lowerK = k.toLowerCase().trim();
+      const foundKey = Object.keys(s).find(key => key.toLowerCase().trim() === lowerK);
+      if (foundKey && s[foundKey] !== undefined && s[foundKey] !== null) return s[foundKey];
+    }
+    return '';
+  };
+
+  let rawData = String(get(['Data', 'data']) || '');
   if (rawData.includes('T')) {
     rawData = rawData.split('T')[0];
   }
 
-  // Normalizziamo lo stato per evitare problemi di maiuscole/minuscole o spazi
-  const rawStato = String(getVal(s, 'Stato') || getVal(s, 'stato') || '').trim();
+  const rawStato = String(get(['Stato', 'stato']) || '').trim();
   const stato = rawStato.toLowerCase() === 'occupato' ? 'Occupato' : 
                 rawStato.toLowerCase() === 'libero' ? 'Libero' : rawStato;
 
   return {
-    aziendaId: String(getVal(s, 'Id-Azienda') || getVal(s, 'aziendaId') || ''),
+    aziendaId: String(get(['Id-Azienda', 'aziendaId', 'IdAzienda']) || ''),
     data: rawData,
-    inizio: String(getVal(s, 'Inizio') || getVal(s, 'inizio') || ''),
-    fine: String(getVal(s, 'Fine') || getVal(s, 'fine') || ''),
-    durata: String(getVal(s, 'Durata') || getVal(s, 'durata') || ''),
+    inizio: String(get(['Inizio', 'inizio']) || ''),
+    fine: String(get(['Fine', 'fine']) || ''),
+    durata: String(get(['Durata', 'durata']) || ''),
     stato: stato,
-    dipendenteEmail: String(getVal(s, 'Mail Lavoratore') || getVal(s, 'mail lavoratore') || getVal(s, 'dipendenteEmail') || getVal(s, 'email') || getVal(s, 'Mail') || '').trim(),
-    dipendenteNome: String(getVal(s, 'Nome') || getVal(s, 'nome') || getVal(s, 'dipendenteNome') || getVal(s, 'Nome Lavoratore') || getVal(s, 'nome lavoratore') || getVal(s, 'Nominativo') || getVal(s, 'nominativo') || '').trim()
+    dipendenteEmail: String(get(['Mail Lavoratore', 'mail lavoratore', 'dipendenteEmail', 'email', 'Mail']) || '').trim(),
+    dipendenteNome: String(get(['Nome', 'nome', 'dipendenteNome', 'Nome Lavoratore', 'Nominativo', 'nominativo']) || '').trim()
   };
 };
 
@@ -513,8 +517,10 @@ const Dashboard = () => {
               const slot = eventInfo.event.extendedProps as Slot;
               const isOccupied = slot.stato?.toLowerCase() === 'occupato';
               
+              // Priorità al nome già presente nello slot
               let employeeName = slot.dipendenteNome || '';
               
+              // Se occupato ma manca il nome, proviamo a cercarlo in cache tramite email
               if (isOccupied && !employeeName && slot.dipendenteEmail) {
                 const searchEmail = slot.dipendenteEmail.toLowerCase().trim();
                 for (const azId in dipendentiCache) {
@@ -527,6 +533,7 @@ const Dashboard = () => {
                     }
                   }
                 }
+                // Se ancora non lo troviamo, usiamo il prefisso dell'email
                 if (!employeeName) employeeName = slot.dipendenteEmail.split('@')[0];
               }
 
@@ -536,7 +543,7 @@ const Dashboard = () => {
                     {isOccupied ? (employeeName || 'Occupato') : 'Libero'}
                   </div>
                   <div className="text-[9px] opacity-80 truncate leading-tight mt-0.5">
-                    {(slot as any).aziendaNome || slot.aziendaId} • {eventInfo.timeText}
+                    {slot.aziendaId} • {eventInfo.timeText}
                   </div>
                 </div>
               );
