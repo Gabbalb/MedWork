@@ -93,16 +93,26 @@ async function startServer() {
 
   // API Routes
   app.post('/api/login', (req, res) => {
-    const { email, password } = req.body;
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPass = process.env.ADMIN_PASSWORD;
+    try {
+      const { email, password } = req.body;
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminPass = process.env.ADMIN_PASSWORD;
 
-    if (email && password && email === adminEmail && password === adminPass) {
-      res.json({ success: true });
-    } else {
-      res.status(401).json({ success: false, message: 'Credenziali non valide' });
+      console.log(`Tentativo di login per: ${email}`);
+      console.log('Configurazione admin presente:', !!adminEmail, !!adminPass);
+
+      if (email && password && email === adminEmail && password === adminPass) {
+        return res.json({ success: true });
+      } else {
+        return res.status(401).json({ success: false, message: 'Credenziali non valide' });
+      }
+    } catch (err) {
+      console.error('Errore rotta login:', err);
+      return res.status(500).json({ success: false, message: 'Errore interno del server' });
     }
   });
+
+  app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
   app.get('/api/aziende', async (req, res) => {
     await cleanupOldSlots();

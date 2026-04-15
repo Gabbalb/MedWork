@@ -155,12 +155,18 @@ const Login = ({ onLogin }: { onLogin: () => void }) => {
         localStorage.setItem('medwork_auth', 'true');
         onLogin();
       } else {
-        const data = await response.json();
-        setError(data.message || 'Credenziali non valide. Riprova.');
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          setError(data.message || 'Credenziali non valide. Riprova.');
+        } catch (e) {
+          setError(`Errore del server (${response.status}). Verifica la configurazione.`);
+          console.error('Risposta non JSON:', text);
+        }
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Errore di connessione al server.');
+      setError('Impossibile connettersi al server. Verifica la tua connessione.');
     }
   };
 
