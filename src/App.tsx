@@ -2234,13 +2234,13 @@ const BookingView = ({ token }: { token: string }) => {
                   
                   {message.type === 'success' && message.slot && (
                     <div className="bg-white/50 border border-green-200 p-4 rounded-2xl w-full max-w-sm mt-2 text-left">
-                      <p className="text-xs uppercase tracking-widest font-black text-green-600 mb-2">Dettagli Appuntamento</p>
-                      <p className="font-bold text-gray-900">{format(new Date(message.slot.data), 'EEEE d MMMM', { locale: it })}</p>
-                      <p className="text-green-700 font-bold">{message.slot.inizio} — {message.slot.fine}</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] font-black text-green-600 mb-4 border-b border-green-100 pb-2">Dettagli Appuntamento</p>
+                      <p className="font-bold text-gray-900 text-lg leading-tight">{format(new Date(message.slot.data), 'EEEE d MMMM', { locale: it })}</p>
+                      <p className="text-green-700 font-black text-2xl tracking-tighter">{message.slot.inizio} — {message.slot.fine}</p>
                       {message.slot.luogo && (
-                        <div className="mt-2 text-xs font-bold text-gray-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          <span>Presso: {message.slot.luogo}</span>
+                        <div className="mt-3 py-2 px-1 text-xl font-black text-red-600 flex items-center gap-2 border-t border-green-100">
+                          <MapPin className="w-5 h-5 shadow-sm" />
+                          <span>{message.slot.luogo}</span>
                         </div>
                       )}
                     </div>
@@ -2430,6 +2430,12 @@ const BookingView = ({ token }: { token: string }) => {
                   <p className="text-lg font-black text-gray-800 capitalize">
                     {format(new Date(confirmingSlot.data), 'EEEE d MMMM', { locale: it })}
                   </p>
+                  {confirmingSlot.luogo && (
+                    <p className="text-xl font-black text-red-600 mt-2 flex items-center justify-center gap-2">
+                      <MapPin className="w-5 h-5" />
+                      {confirmingSlot.luogo}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-4">
