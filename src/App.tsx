@@ -58,6 +58,7 @@ interface Slot {
   stato: string;
   dipendenteEmail?: string;
   dipendenteNome?: string;
+  luogo?: string;
 }
 
 interface Dipendente {
@@ -98,7 +99,8 @@ const normalizeSlot = (s: any): Slot => {
     durata: String(get(['Durata', 'durata']) || ''),
     stato: stato,
     dipendenteEmail: String(get(['Mail Lavoratore', 'mail lavoratore', 'dipendenteEmail', 'email', 'Mail']) || '').trim(),
-    dipendenteNome: String(get(['Nome', 'nome', 'dipendenteNome', 'Nome Lavoratore', 'Nominativo', 'nominativo']) || '').trim()
+    dipendenteNome: String(get(['Nome', 'nome', 'dipendenteNome', 'Nome Lavoratore', 'Nominativo', 'nominativo']) || '').trim(),
+    luogo: String(get(['Luogo', 'luogo']) || '').trim()
   };
 };
 
@@ -1020,6 +1022,7 @@ const CompanyDetail = () => {
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('13:00');
   const [duration, setDuration] = useState(30);
+  const [location, setLocation] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [originalDate, setOriginalDate] = useState('');
@@ -1277,7 +1280,8 @@ const CompanyDetail = () => {
         format(current, 'HH:mm'),
         format(slotEnd, 'HH:mm'),
         duration.toString(),
-        'Libero'
+        'Libero',
+        location // Include location
       ]);
       current = slotEnd;
     }
@@ -1364,7 +1368,8 @@ const CompanyDetail = () => {
       rawDate: firstDateISO,
       start: startTime,
       end: endTime,
-      duration: duration
+      duration: duration,
+      location: sameDateSlots[0].luogo
     };
   })() : null;
 
@@ -1395,6 +1400,11 @@ const CompanyDetail = () => {
                 <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
                   <CalendarIcon className="w-4 h-4" />
                   <span>Prossima convocazione il giorno <strong>{nextConvocation.date}</strong> dalle ore <strong>{nextConvocation.start}</strong> alle ore <strong>{nextConvocation.end}</strong></span>
+                  {nextConvocation.location && (
+                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg text-xs font-bold border border-amber-200">
+                      C/O {nextConvocation.location}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-2 border-l border-amber-200 pl-3">
                   <button 
@@ -1510,6 +1520,17 @@ const CompanyDetail = () => {
                 <option value={45}>45 minuti</option>
                 <option value={60}>60 minuti</option>
               </select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Luogo della visita</label>
+              <input 
+                type="text" 
+                placeholder="es. Sede San Donato"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
             </div>
 
             <button
@@ -1916,6 +1937,17 @@ const CompanyDetail = () => {
                     </select>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-900 ml-1">Luogo della visita</label>
+                    <input 
+                      type="text" 
+                      placeholder="es. Sede San Donato"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700 font-medium bg-gray-50/30"
+                    />
+                  </div>
+
                   <div className="pt-6 flex flex-col gap-3">
                     <button 
                       onClick={async () => {
@@ -2292,6 +2324,7 @@ const BookingView = ({ token }: { token: string }) => {
                                     </p>
                                     <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
                                       Fino alle {slot.fine}
+                                      {slot.luogo && <span className="ml-2">— {slot.luogo}</span>}
                                     </p>
                                   </div>
                                   {!isCurrent && (

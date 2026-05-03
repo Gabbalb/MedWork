@@ -156,7 +156,7 @@ function getAllSlots() {
   var tz = ss.getSpreadsheetTimeZone(); 
   
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Id-Azienda', 'Data', 'Inizio', 'Fine', 'Durata', 'Stato', 'Mail Lavoratore', 'Nome', 'ID_Calendario']);
+    sheet.appendRow(['Id-Azienda', 'Data', 'Inizio', 'Fine', 'Durata', 'Stato', 'Mail Lavoratore', 'Nome', 'ID_Calendario', 'Luogo']);
     return [];
   }
   
@@ -304,9 +304,10 @@ function updateSlot(params) {
       var eventId = data[i][8]; // Colonna I
       var fine = data[i][3];    
       var aziendaNome = getAziendaNome(aziendaId);
+      var luogo = data[i][9]; // Colonna J
       
       if (nuovoStato === 'Occupato') {
-        var newId = syncToCalendar(eventId, nome, aziendaNome, dateStr, inizio, fine, mail);
+        var newId = syncToCalendar(eventId, nome, aziendaNome, dateStr, inizio, fine, mail, { luogo: luogo });
         sheet.getRange(i + 1, 9).setValue(newId);
         
         // Se è una nuova prenotazione (non un aggiornamento tecnico), manda mail
@@ -346,7 +347,8 @@ function deleteSlot(params) {
 
 // --- FUNZIONI DI SUPPORTO ---
 
-function syncToCalendar(eventId, nome, azienda, data, inizio, fine, mail) {
+function syncToCalendar(eventId, nome, azienda, data, inizio, fine, mail, params) {
+  params = params || {};
   try {
     var cal = CalendarApp.getCalendarById(CALENDAR_ID);
     if (!cal) {
@@ -370,14 +372,15 @@ function syncToCalendar(eventId, nome, azienda, data, inizio, fine, mail) {
     }
 
     var title = "Visita: " + (nome || "N/A") + " - " + azienda;
-    var desc = "Lavoratore: " + (nome || "N/A") + "\nEmail: " + mail + "\nAzienda: " + azienda;
+    var desc = "Lavoratore: " + (nome || "N/A") + "\nEmail: " + mail + "\nAzienda: " + azienda + (params.luogo ? "\nLuogo: " + params.luogo : "");
+    var loc = params.luogo || "";
 
     // Se abbiamo già un ID, proviamo ad aggiornare l'evento esistente
     if (eventId) {
       try {
         var event = cal.getEventById(eventId);
         if (event) {
-          event.setTitle(title).setDescription(desc).setTime(start, end);
+          event.setTitle(title).setDescription(desc).setTime(start, end).setLocation(loc);
           Logger.log("Evento aggiornato con successo: " + eventId);
           return eventId;
         }
@@ -387,7 +390,7 @@ function syncToCalendar(eventId, nome, azienda, data, inizio, fine, mail) {
     }
     
     // Creazione nuovo evento
-    var newEvent = cal.createEvent(title, start, end, {description: desc});
+    var newEvent = cal.createEvent(title, start, end, {description: desc, location: loc});
     var newId = newEvent.getId();
     Logger.log("Nuovo evento creato con successo: " + newId);
     return newId;
@@ -419,8 +422,8 @@ function getAziendaNome(id) {
 function addSlots(slots) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Disponibilita');
   slots.forEach(function(s) {
-    // Aggiunge Id-Azienda, Data, Inizio, Fine, Durata, Stato, Mail(vuota), Nome(vuoto), ID_Cal(vuoto)
-    sheet.appendRow([s[0], s[1], s[2], s[3], s[4], s[5], "", "", ""]);
+    // Aggiunge Id-Azienda, Data, Inizio, Fine, Durata, Stato, Mail(vuota), Nome(vuoto), ID_Cal(vuoto), Luogo
+    sheet.appendRow([s[0], s[1], s[2], s[3], s[4], s[5], "", "", "", s[6] || ""]);
   });
   return {success: true};
 }
@@ -447,7 +450,7 @@ function syncAllExistingSlots() {
       var dateStr = (data[i][1] instanceof Date) ? 
         Utilities.formatDate(data[i][1], ss.getSpreadsheetTimeZone(), "yyyy-MM-dd") : 
         String(data[i][1]).split('T')[0];
-      var newId = syncToCalendar('', data[i][7], getAziendaNome(data[i][0]), dateStr, data[i][2], data[i][3], data[i][6]);
+      var newId = syncToCalendar('', data[i][7], getAziendaNome(data[i][0]), dateStr, data[i][2], data[i][3], data[i][6], { luogo: data[i][9] });
       if (newId) {
         sheet.getRange(i + 1, 9).setValue(newId);
         count++;
