@@ -178,11 +178,23 @@ function getAllSlots() {
 // --- LOGICA EMAIL ---
 
 function sendInvitations(aziendaId, emailsToInvite) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dipendenti = getDipendenti(aziendaId);
   var aziendaNome = getAziendaNome(aziendaId);
   var count = 0;
   var errors = [];
   
+  // Cerchiamo il luogo dai primi slot disponibili per questa azienda
+  var dispSheet = ss.getSheetByName('Disponibilita');
+  var dispData = dispSheet.getDataRange().getValues();
+  var luogo = "";
+  for (var i = 1; i < dispData.length; i++) {
+    if (String(dispData[i][0]) === aziendaId && dispData[i][5] === 'Libero') {
+      luogo = dispData[i][9] || "";
+      break;
+    }
+  }
+
   // Se emailsToInvite è fornito, filtriamo i dipendenti
   if (emailsToInvite && Array.isArray(emailsToInvite) && emailsToInvite.length > 0) {
     dipendenti = dipendenti.filter(function(d) {
@@ -197,25 +209,28 @@ function sendInvitations(aziendaId, emailsToInvite) {
     
     if (email && email.indexOf('@') !== -1) {
       try {
-        // Genera Token: AziendaID|DipendenteID|Nome|Email
         var rawToken = aziendaId + "|" + d.ID + "|" + nome + "|" + email;
         var token = Utilities.base64Encode(rawToken, Utilities.Charset.UTF_8);
         var magicLink = APP_URL + "?token=" + token;
         
-        var subject = "Prenotazione Visita Medica - " + aziendaNome;
+        var subject = "Convocazione Visita Medica Periodica - " + aziendaNome;
         
         var htmlBody = 
-          '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">' +
-            '<h2 style="color: #1d4ed8;">Prenotazione Visita Medica</h2>' +
-            '<p>Gentile <strong>' + nome + '</strong>,</p>' +
-            '<p>È necessario prenotare la visita medica periodica obbligatoria per l\'azienda <strong>' + aziendaNome + '</strong>.</p>' +
-            '<p>Puoi scegliere la data e l\'orario che preferisci cliccando sul pulsante qui sotto:</p>' +
-            '<div style="text-align: center; margin: 30px 0;">' +
-              '<a href="' + magicLink + '" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Scegli Orario Visita</a>' +
+          '<div style="font-family: serif; max-width: 650px; margin: 0 auto; padding: 40px; color: #1a1a1a; line-height: 1.6; border: 1px solid #f0f0f0;">' +
+            '<p>Buongiorno,</p>' +
+            '<p>Al fine di programmare la visita medica prevista dal protocollo di sorveglianza sanitaria ' + (luogo ? 'presso <strong>' + luogo + '</strong>' : '') + ', la S.V. è invitata a procedere con la prenotazione dell\'appuntamento tramite il portale dedicato.</p>' +
+            '<div style="text-align: center; margin: 35px 0;">' +
+              '<a href="' + magicLink + '" style="background-color: #000; color: #fff; padding: 16px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; display: inline-block; letter-spacing: 1px; text-transform: uppercase;">Prenota Visita Medica</a>' +
             '</div>' +
-            '<p style="font-size: 12px; color: #6b7280;">Se il pulsante non funziona, copia e incolla questo link nel browser:<br>' + magicLink + '</p>' +
-            '<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">' +
-            '<p style="font-size: 14px; color: #374151;">Cordiali saluti,<br><strong>Lara Balbiani - Medico del Lavoro</strong></p>' +
+            '<p>Si ricorda che il lavoratore dovrà presentarsi presso ' + (luogo ? '<strong>' + luogo + '</strong>' : 'la sede indicata') + ' all\'orario concordato.</p>' +
+            '<p>Qualora fosse in possesso di documentazione sanitaria relativa alla sorveglianza sanitaria svolta presso il precedente datore di lavoro (per chi effettua la prima visita) e/o inerente problematiche di salute rilevanti, si prega di portarla in visione in sede di visita.</p>' +
+            '<p>In caso di imprevisti che impediscano la presenza nel giorno e nell\'ora concordati, si prega di darne tempestiva comunicazione a questo indirizzo email, indicando contestualmente le proprie ulteriori disponibilità.</p>' +
+            '<p>Ringraziando per la collaborazione, porgo cordiali saluti.</p>' +
+            '<div style="margin-top: 40px; border-top: 2px solid #000; pt: 20px; font-size: 13px; color: #444;">' +
+              '<p style="margin: 5px 0;"><strong>DOTT.SSA LARA BALBIANI</strong></p>' +
+              '<p style="margin: 0;">Specialista in Medicina del Lavoro</p>' +
+              '<p style="margin: 0;">Via Fausto Gamba 7 - 25128 Brescia</p>' +
+            '</div>' +
           '</div>';
         
         GmailApp.sendEmail(email, subject, "", { htmlBody: htmlBody });
@@ -226,11 +241,7 @@ function sendInvitations(aziendaId, emailsToInvite) {
     }
   });
   
-  return { 
-    success: true, 
-    sent: count, 
-    errors: errors.length > 0 ? errors : null 
-  };
+  return { success: true, sent: count, errors: errors.length > 0 ? errors : null };
 }
 
 function sendConfirmationEmail(params, aziendaNome) {
@@ -238,39 +249,46 @@ function sendConfirmationEmail(params, aziendaNome) {
   var inizio = params.inizio;
   var nome = params.dipendenteNome;
   var mail = params.dipendenteEmail;
+  var luogo = params.luogo || "";
   
-  // Mail al Dipendente
+  // Link per modifica (Token: AziendaID|DipendenteID|Nome|Email)
   var rawToken = params.aziendaId + "|" + "" + "|" + nome + "|" + mail;
   var token = Utilities.base64Encode(rawToken, Utilities.Charset.UTF_8);
   var magicLink = APP_URL + "?token=" + token;
   
-  var subDip = "Conferma Prenotazione Visita Medica";
+  var subDip = "Conferma Prenotazione Visita Medica - " + aziendaNome;
   var htmlDip = 
-    '<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">' +
-      '<h2 style="color: #059669;">Prenotazione Confermata</h2>' +
+    '<div style="font-family: serif; max-width: 650px; margin: 0 auto; padding: 40px; color: #1a1a1a; line-height: 1.6; border: 1px solid #f0f0f0;">' +
+      '<h2 style="border-bottom: 2px solid #000; padding-bottom: 10px; text-transform: uppercase; font-size: 18px;">Prenotazione Confermata</h2>' +
       '<p>Gentile <strong>' + nome + '</strong>,</p>' +
-      '<p>La tua visita medica è stata confermata con successo.</p>' +
-      '<div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">' +
-        '<p style="margin: 0; color: #166534;"><strong>Data:</strong> ' + dateStr + '</p>' +
-        '<p style="margin: 5px 0 0 0; color: #166534;"><strong>Orario:</strong> ' + inizio + '</p>' +
+      '<p>Si conferma il corretto inserimento della prenotazione per la visita medica periodica.</p>' +
+      '<div style="background-color: #f9f9f9; padding: 25px; border-left: 4px solid #000; margin: 25px 0;">' +
+        '<p style="margin: 0 0 10px 0;"><strong>DATA:</strong> ' + dateStr + '</p>' +
+        '<p style="margin: 0 0 10px 0;"><strong>ORARIO:</strong> ' + inizio + '</p>' +
+        (luogo ? '<p style="margin: 0;"><strong>LUOGO:</strong> ' + luogo + '</p>' : '') +
       '</div>' +
-      '<p>Se desideri <strong>modificare</strong> la prenotazione, puoi farlo cliccando qui sotto:</p>' +
-      '<div style="text-align: center; margin: 20px 0;">' +
-        '<a href="' + magicLink + '" style="background-color: #4b5563; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Modifica Prenotazione</a>' +
+      '<p>Qualora fosse necessario procedere alla <strong>modifica</strong> dell\'appuntamento già fissato, è possibile farlo in autonomia tramite il seguente collegamento:</p>' +
+      '<div style="text-align: center; margin: 25px 0;">' +
+        '<a href="' + magicLink + '" style="background-color: #444; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 13px; display: inline-block;">Modifica Appuntamento</a>' +
       '</div>' +
-      '<hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">' +
-      '<p style="font-size: 14px; color: #374151;">Cordiali saluti,<br><strong>Lara Balbiani - Medico del Lavoro</strong></p>' +
+      '<p>Si ricorda l\'importanza della puntualità e di portare in visione l\'eventuale documentazione sanitaria richiesta.</p>' +
+      '<p>Restiamo a disposizione per ogni chiarimento.</p>' +
+      '<div style="margin-top: 40px; border-top: 2px solid #000; pt: 20px; font-size: 13px; color: #444;">' +
+        '<p style="margin: 5px 0;"><strong>DOTT.SSA LARA BALBIANI</strong></p>' +
+        '<p style="margin: 0;">Specialista in Medicina del Lavoro</p>' +
+        '<p style="margin: 0;">Via Fausto Gamba 7 - 25128 Brescia</p>' +
+      '</div>' +
     '</div>';
   
   GmailApp.sendEmail(mail, subDip, "", { htmlBody: htmlDip });
   
-  // Mail al Dottore
   var subDoc = "Nuova Prenotazione: " + nome + " (" + aziendaNome + ")";
-  var bodyDoc = "Nuova prenotazione ricevuta:\n\n" +
+  var bodyDoc = "Conferma nuova prenotazione:\n\n" +
                 "Lavoratore: " + nome + "\n" +
                 "Azienda: " + aziendaNome + "\n" +
                 "Data: " + dateStr + "\n" +
                 "Ora: " + inizio + "\n" +
+                "Luogo: " + luogo + "\n" +
                 "Email: " + mail;
   
   GmailApp.sendEmail(DOCTOR_EMAIL, subDoc, bodyDoc);
@@ -312,6 +330,7 @@ function updateSlot(params) {
         
         // Se è una nuova prenotazione (non un aggiornamento tecnico), manda mail
         if (vecchioStato !== 'Occupato' && mail) {
+          params.luogo = luogo;
           sendConfirmationEmail(params, aziendaNome);
         }
       } else if (nuovoStato === 'Libero' && eventId) {
