@@ -23,7 +23,9 @@ import {
   Pencil,
   User,
   Mail,
-  MapPin
+  MapPin,
+  Download,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
@@ -486,6 +488,41 @@ const Dashboard = () => {
     }
   };
 
+  const handleDownloadOccupiedSlots = (aziendaId: string, aziendaNome: string) => {
+    if (!allSlots || allSlots.length === 0) return;
+    
+    const occupiedSlots = allSlots
+      .filter(s => s.aziendaId === aziendaId && s.stato === 'Occupato')
+      .sort((a, b) => {
+        const dA = new Date(`${a.data}T${a.inizio}`);
+        const dB = new Date(`${b.data}T${b.inizio}`);
+        return dA.getTime() - dB.getTime();
+      });
+
+    if (occupiedSlots.length === 0) {
+      alert("Non ci sono visite prenotate da scaricare per questa azienda.");
+      return;
+    }
+
+    const header = `ELENCO CONVOCAZIONI - ${aziendaNome}\n`;
+    const subheader = `GENERATO IL: ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n\n`;
+    const content = occupiedSlots.map(s => {
+      const dateFormatted = format(new Date(s.data), 'dd/MM/yyyy');
+      return `${s.dipendenteNome || 'N/A'}, ${dateFormatted} ore ${s.inizio}`;
+    }).join('\n');
+
+    const fullText = header + subheader + content;
+    const blob = new Blob([fullText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `convocazioni_${aziendaNome.toLowerCase().replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -575,6 +612,19 @@ const Dashboard = () => {
                   <span>{azienda.indirizzo || 'Indirizzo non specificato'}</span>
                 </div>
               </Link>
+              <div className="px-6 pb-6 pt-0 border-t border-gray-50 bg-gray-50/30">
+                <button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDownloadOccupiedSlots(azienda.id, azienda.nome);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-600 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Scarica Convocati (.txt)
+                </button>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -1333,6 +1383,41 @@ const CompanyDetail = () => {
     }
   };
 
+  const handleDownloadOccupiedSlots = () => {
+    if (!slots || slots.length === 0) return;
+    
+    const occupiedSlots = slots
+      .filter(s => s.stato === 'Occupato')
+      .sort((a, b) => {
+        const dA = new Date(`${a.data}T${a.inizio}`);
+        const dB = new Date(`${b.data}T${b.inizio}`);
+        return dA.getTime() - dB.getTime();
+      });
+
+    if (occupiedSlots.length === 0) {
+      alert("Non ci sono visite prenotate da scaricare.");
+      return;
+    }
+
+    const header = `ELENCO CONVOCAZIONI - ${azienda?.nome || 'AZIENDA'}\n`;
+    const subheader = `GENERATO IL: ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n\n`;
+    const content = occupiedSlots.map(s => {
+      const dateFormatted = format(new Date(s.data), 'dd/MM/yyyy');
+      return `${s.dipendenteNome || 'N/A'}, ${dateFormatted} ore ${s.inizio}`;
+    }).join('\n');
+
+    const fullText = header + subheader + content;
+    const blob = new Blob([fullText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `convocazioni_${azienda?.nome?.toLowerCase().replace(/\s+/g, '_') || 'azienda'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   if (!GAS_URL) return <div className="text-center py-20 text-amber-600 font-medium">Configurazione mancante: VITE_GAS_URL non impostata.</div>;
   if (!azienda) return <div className="text-center py-20">Azienda non trovata.</div>;
@@ -1435,6 +1520,14 @@ const CompanyDetail = () => {
               {invitationSuccess}
             </div>
           )}
+          <button 
+            onClick={handleDownloadOccupiedSlots}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 transition-all"
+            title="Scarica l'elenco dei lavoratori prenotati per le Risorse Umane"
+          >
+            <Download className="w-4 h-4" />
+            Scarica Elenco
+          </button>
           <button 
             onClick={handleSendInvitations}
             disabled={inviting}
