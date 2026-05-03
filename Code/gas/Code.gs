@@ -220,13 +220,14 @@ function sendInvitations(aziendaId, emailsToInvite) {
             '<p>Buongiorno,</p>' +
             '<p>Al fine di programmare la visita medica prevista dal protocollo di sorveglianza sanitaria ' + (luogo ? 'presso <strong>' + luogo + '</strong>' : '') + ', la S.V. è invitata a procedere con la prenotazione dell\'appuntamento tramite il portale dedicato.</p>' +
             '<div style="text-align: center; margin: 35px 0;">' +
-              '<a href="' + magicLink + '" style="background-color: #000; color: #fff; padding: 16px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; display: inline-block; letter-spacing: 1px; text-transform: uppercase;">Prenota Visita Medica</a>' +
+              '<a href="' + magicLink + '" style="background-color: #dc2626; color: #fff; padding: 18px 36px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 15px; display: inline-block; letter-spacing: 1px; text-transform: uppercase; shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">Prenota Visita Medica</a>' +
             '</div>' +
             '<p>Si ricorda che il lavoratore dovrà presentarsi presso ' + (luogo ? '<strong>' + luogo + '</strong>' : 'la sede indicata') + ' all\'orario concordato.</p>' +
+            '<p><strong>Nota importante:</strong> Una volta completata la prenotazione, riceverà una comunicazione di conferma. Qualora fosse necessario modificare l\'appuntamento in un secondo momento, la invitiamo a utilizzare esclusivamente l\'apposito collegamento che troverà all\'interno della suddetta email di conferma.</p>' +
             '<p>Qualora fosse in possesso di documentazione sanitaria relativa alla sorveglianza sanitaria svolta presso il precedente datore di lavoro (per chi effettua la prima visita) e/o inerente problematiche di salute rilevanti, si prega di portarla in visione in sede di visita.</p>' +
             '<p>In caso di imprevisti che impediscano la presenza nel giorno e nell\'ora concordati, si prega di darne tempestiva comunicazione a questo indirizzo email, indicando contestualmente le proprie ulteriori disponibilità.</p>' +
             '<p>Ringraziando per la collaborazione, porgo cordiali saluti.</p>' +
-            '<div style="margin-top: 40px; border-top: 2px solid #000; pt: 20px; font-size: 13px; color: #444;">' +
+            '<div style="margin-top: 40px; border-top: 2px solid #000; padding-top: 20px; font-size: 13px; color: #444;">' +
               '<p style="margin: 5px 0;"><strong>DOTT.SSA LARA BALBIANI</strong></p>' +
               '<p style="margin: 0;">Specialista in Medicina del Lavoro</p>' +
               '<p style="margin: 0;">Via Fausto Gamba 7 - 25128 Brescia</p>' +

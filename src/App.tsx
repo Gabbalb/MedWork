@@ -22,7 +22,8 @@ import {
   Trash2,
   Pencil,
   User,
-  Mail
+  Mail,
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addMinutes, parse, isBefore, isAfter, isValid } from 'date-fns';
@@ -2098,7 +2099,7 @@ const BookingView = ({ token }: { token: string }) => {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [confirmingSlot, setConfirmingSlot] = useState<any>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string, slot?: any } | null>(null);
 
   const fetchSlots = async () => {
     setLoading(true);
@@ -2176,7 +2177,11 @@ const BookingView = ({ token }: { token: string }) => {
           });
         }
         setConfirmingSlot(null); // Chiudiamo il modale solo al successo
-        setMessage({ type: 'success', text: 'Prenotazione confermata con successo! Riceverai una mail di conferma a breve.' });
+        setMessage({ 
+          type: 'success', 
+          text: 'Prenotazione confermata con successo! Riceverai una mail di conferma a breve.',
+          slot: slot
+        });
         fetchSlots();
       } else {
         setConfirmingSlot(null);
@@ -2226,6 +2231,21 @@ const BookingView = ({ token }: { token: string }) => {
                   )}
                   <h2 className="text-2xl font-black">{message.type === 'success' ? 'Fatto!' : 'Ops!'}</h2>
                   <p className="text-lg font-bold leading-tight">{message.text}</p>
+                  
+                  {message.type === 'success' && message.slot && (
+                    <div className="bg-white/50 border border-green-200 p-4 rounded-2xl w-full max-w-sm mt-2 text-left">
+                      <p className="text-xs uppercase tracking-widest font-black text-green-600 mb-2">Dettagli Appuntamento</p>
+                      <p className="font-bold text-gray-900">{format(new Date(message.slot.data), 'EEEE d MMMM', { locale: it })}</p>
+                      <p className="text-green-700 font-bold">{message.slot.inizio} — {message.slot.fine}</p>
+                      {message.slot.luogo && (
+                        <div className="mt-2 text-xs font-bold text-gray-500 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          <span>Presso: {message.slot.luogo}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {message.type === 'success' && (
                     <p className="text-sm text-green-700 font-medium">Puoi chiudere questa pagina in sicurezza.</p>
                   )}
@@ -2254,6 +2274,12 @@ const BookingView = ({ token }: { token: string }) => {
                         {format(new Date(myBooking.data), 'EEEE d MMMM', { locale: it })}
                       </p>
                       <p className="text-blue-600 font-black text-lg mt-1">{myBooking.inizio} — {myBooking.fine}</p>
+                      {myBooking.luogo && (
+                        <p className="text-xs font-bold text-gray-500 mt-2 flex items-center gap-1 uppercase tracking-wider">
+                          <MapPin className="w-3 h-3" />
+                          Presso: {myBooking.luogo}
+                        </p>
+                      )}
                     </div>
                     <div className="bg-green-500 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-green-100 flex items-center gap-2">
                       <CheckCircle2 className="w-3 h-3" />
@@ -2322,9 +2348,15 @@ const BookingView = ({ token }: { token: string }) => {
                                     <p className="font-black text-xl text-gray-900 leading-none mb-1 group-hover:text-blue-600 transition-colors">
                                       {slot.inizio}
                                     </p>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                                      Fino alle {slot.fine}
-                                      {slot.luogo && <span className="ml-2">— {slot.luogo}</span>}
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1">
+                                      {slot.luogo ? (
+                                        <>
+                                          <MapPin className="w-3 h-3 text-blue-600" />
+                                          <span className="truncate">{slot.luogo}</span>
+                                        </>
+                                      ) : (
+                                        <span>Fino alle {slot.fine}</span>
+                                      )}
                                     </p>
                                   </div>
                                   {!isCurrent && (
